@@ -8,8 +8,6 @@ import numpy as np
 import logging
 from logging import *
 from time import sleep
-
-#third party imports
 import RPi.GPIO as GPIO
 
 #my imports 
@@ -59,10 +57,10 @@ imu_samples = imuFreq*burst_seconds
 imu_gpio=config.getInt('IMU', 'imu_gpio')
 
 #initialize IMU GPIO pin as modem on/off control
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(imu_gpio,GPIO.OUT)
+#GPIO.setmode(GPIO.BCM)
+#GPIO.setup(imu_gpio,GPIO.OUT)
 #turn IMU on for script recognizes i2c address
-GPIO.output(imu_gpio,GPIO.HIGH)
+#GPIO.output(imu_gpio,GPIO.HIGH)
 
 """
 FXOS8700 accelerometer range values
@@ -80,7 +78,7 @@ GYRO_RANGE_2000DPS  = 2000
 def init_imu():
     #initialize fxos and fxas devices (required after turning off device)
     logger.info('power on IMU')
-    GPIO.output(imu_gpio,GPIO.HIGH)
+    #GPIO.output(imu_gpio,GPIO.HIGH)
     i2c = busio.I2C(board.SCL, board.SDA)
     fxos = adafruit_fxos8700_microSWIFT.FXOS8700(i2c, accel_range=0x00)
     fxas = adafruit_fxas21002c_microSWIFT.FXAS21002C(i2c, gyro_range=500)
@@ -96,23 +94,18 @@ def init_imu():
 # and print them out.
 imu = []
 isample = 0
-
-
 tStart = time.time()
 #-------------------------------------------------------------------------------
 #LOOP BEGINS
 #-------------------------------------------------------------------------------
 logger.info('---------------recordIMU.py------------------')
 while True:
-    
-    
     now=datetime.utcnow()
     if  now.minute == burst_time or now.minute % burst_interval == 0 and now.second == 0:
         
         logger.info('initializing IMU')
         fxos, fxas = init_imu()
         logger.info('IMU initialized')
-        
         logger.info('starting burst')
         
         #create new file for new burst interval 
@@ -124,7 +117,6 @@ while True:
             t_end = time.time() + burst_seconds #get end time for burst
             isample=0
             while time.time() <= t_end or isample < imu_samples:
-        
                 try:
                     accel_x, accel_y, accel_z = fxos.accelerometer
                     mag_x, mag_y, mag_z = fxos.magnetometer
@@ -134,13 +126,10 @@ while True:
                     logger.info('error reading IMU data')
          
                 timestamp='{:%Y-%m-%d %H:%M:%S}'.format(datetime.utcnow())
-
                 imu_out.write('%s,%f,%f,%f,%f,%f,%f,%f,%f,%f\n' %(timestamp,accel_x,accel_y,accel_z,mag_x,mag_y,mag_z,gyro_x,gyro_y,gyro_z))
                 imu_out.flush()
         
                 isample = isample + 1
-                
-               
                 if time.time() >= t_end and 0 < imu_samples-isample <= 40:
                     continue
                 elif time.time() > t_end and imu_samples-isample > 40:
@@ -152,9 +141,7 @@ while True:
             logger.info('end burst')
             logger.info('IMU samples %s' %isample)  
             #turn imu off     
-            GPIO.output(imu_gpio,GPIO.LOW)
+            #GPIO.output(imu_gpio,GPIO.LOW)
             logger.info('power down IMU')
-            
-
     
     sleep(.50)

@@ -10,16 +10,9 @@ import os.path
 import configparser
 from io import StringIO
 
-'''
-# Class def start
-'''
-class Config:
 
-    ########################################################################
-    # Constructor
-    ########################################################################
+class Config:
     def __init__(self):
-        # Does nothing
         return
         
     ########################################################################
@@ -36,8 +29,8 @@ class Config:
         config.get('Section_name', 'Param_name')
         Every parameter needs to be in a section, except for the expansion params, which need to start with $ as the first
         character on the line.
-        """
 
+        """
         # Sanity check
         if( not os.path.exists(configFilename) ):
             print ('ERROR: File "%s" not found' % configFilename)
@@ -79,16 +72,15 @@ class Config:
         return True
 
         
-    # =============================================================
-    # Get the value associated with the specified
-    # section and keyword as a string
-    #
-    # If the section/keyword does not exist in the dictionary,
-    # then "None" is returned.
-    # =============================================================
-    def getString( self,
-                   section,
-                   key ):
+    def getString(self, section, key):
+        """
+        Get the value associated with the specified
+        section and keyword as a string
+        
+        If the section/keyword does not exist in the dictionary,
+        then "None" is returned.
+
+        """
         try:
             value = self.config.get( section, key )
         except:
@@ -96,18 +88,16 @@ class Config:
             return None
         return value
 
-        
-    # =====================================================================
-    # Get the value associated with the specified
-    # section and keyword as a float.
-    #
-    # If the keyword does not exist in the dictionary, or the value cannot
-    # be represented as an int, then "None" is returned.
-    # =====================================================================
-    def getInt( self,
-                section,
-                key ):
 
+    def getInt(self, section, key):
+        """
+        Get the value associated with the specified
+        section and keyword as a float.
+        
+        If the keyword does not exist in the dictionary, or the value cannot
+        be represented as an int, then "None" is returned.
+
+        """
         # Get the value as a string
         strVal = self.getString(section,key)
         # Bail if it's not there
@@ -125,17 +115,15 @@ class Config:
             return None
 
         
-    # =====================================================================
-    # Get the value associated with the specified
-    # section and keyword as a float.
-    #
-    # If the keyword does not exist in the dictionary, or the value cannot
-    # be represented as a float, then "None" is returned.
-    # =====================================================================
-    def getFloat( self,
-                  section,
-                  key ):
+    def getFloat(self, section, key):
+        """
+        Get the value associated with the specified
+        section and keyword as a float.
+        
+        If the keyword does not exist in the dictionary, or the value cannot
+        be represented as a float, then "None" is returned.
 
+        """
         # Get the value as a string
         strVal = self.getString(section,key)
         # Bail if it's not there
@@ -151,5 +139,3 @@ class Config:
             print ('ERROR: Value "%s" for key "%s" cannot be converted to float' \
                 % (strVal,key))
             return None
-
-        

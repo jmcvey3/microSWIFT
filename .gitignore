@@ -1,5 +1,3 @@
-
-
 data/ #data files
 logs/ #log files
 *.pyc #pycache files

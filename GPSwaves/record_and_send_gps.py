@@ -244,37 +244,37 @@ def record_serial(fname,
                     #isample = isample + 1
                     #print('[%.3f] - isample:%d,ivel:%d,ipos:%d' %(elapsedTime,isample,ivel,ipos))
                     #eventLog.info('[%.3f] - isample:%d,ivel:%d,ipos:%d' %(elapsedTime,isample,ivel,ipos))
-                    	if (ivel > gpsNumSamples) and (setTimeAtEnd == False): 
+                        if (ivel > gpsNumSamples) and (setTimeAtEnd == False): 
                             if ("GPRMC" in newline): 
-                    			splitLine = newline.split(',')
-                    			UTCTime = splitLine[1]
-                    			date = splitLine[9]
+                                splitLine = newline.split(',')
+                                UTCTime = splitLine[1]
+                                date = splitLine[9]
                                 
-                    			splitTime = list(UTCTime)
-                    			hour = splitTime[0] + splitTime[1]
-                    			minute = splitTime[2] + splitTime[3]
-                    			sec = splitTime[4] + splitTime[5]
-                    			second = (int(sec) + 2)
+                                splitTime = list(UTCTime)
+                                hour = splitTime[0] + splitTime[1]
+                                minute = splitTime[2] + splitTime[3]
+                                sec = splitTime[4] + splitTime[5]
+                                second = (int(sec) + 2)
                         
-                    			dateSplit = list(date)
-                    			day = dateSplit[0] + dateSplit[1]
-                    			month = dateSplit[2] + dateSplit[3]
-                    			year = dateSplit[4] + dateSplit[5]
+                                dateSplit = list(date)
+                                day = dateSplit[0] + dateSplit[1]
+                                month = dateSplit[2] + dateSplit[3]
+                                year = dateSplit[4] + dateSplit[5]
                         
-                    			if (hour >= 7 and hour >= 19 or hour == 0):
-                        			hour = int(hour) - 7
-                    			elif (hour >= 20 and hour <= 24):
-                        			hour = int(hour) - 19
-                    			else:
-									hour = int(hour) + 5
+                                if (hour >= 7 and hour >= 19 or hour == 0):
+                                    hour = int(hour) - 7
+                                elif (hour >= 20 and hour <= 24):
+                                    hour = int(hour) - 19
+                                else:
+                                    hour = int(hour) + 5
                             
-                    			hour = format(hour, "02")
-                    			second = format(second, "02")
+                                hour = format(hour, "02")
+                                second = format(second, "02")
                         
-                    			timeStr = (year,month,day,hour,minute,sec)
-                    			subprocess.call(['/home/pi/microSWIFT/utils/setTimeAgain'] + [str(n) for n in timeStr])
-                    			setTimeAtEnd = True
-		    isample = isample + 1
+                                timeStr = (year,month,day,hour,minute,sec)
+                                subprocess.call(['/home/pi/microSWIFT/utils/setTimeAgain'] + [str(n) for n in timeStr])
+                                setTimeAtEnd = True
+                isample = isample + 1
 
             else:
                 print("[%.3f] - No serial data" % elapsedTime)
