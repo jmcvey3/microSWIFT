@@ -103,10 +103,7 @@ def init_gps():
         sleep(1)
 
         #set sampling frequency
-        if gps_freq==1:
-            fs = '1000' #set interval to 1000ms (1 Hz)
-        if gps_freq==4:
-            fs = '250' #set interval to 250ms (4 Hz)
+        fs = str(int(1/gps_freq*1000)) # sampling period in milliseconds
         fs_base_command = 'PMTK220,'+fs
         fs_command = calc_checksum_ascii(fs_base_command)
         logger.info("setting GPS to %s Hz rate: %s" % (gps_freq, fs_command))
