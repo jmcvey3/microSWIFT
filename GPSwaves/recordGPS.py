@@ -16,11 +16,8 @@ from time import sleep
 from config3 import Config
 import process_data
 
-def calc_checksum_hex(message):
-    checksum = sum(map(ord, message))
-    return message + '*' + str(checksum) + '\r\n'
 
-def calc_checksum_ascii(message):
+def calc_checksum(message):
     checksum = 0
     for char in message:
         checksum ^= ord(char)
@@ -87,7 +84,7 @@ def init_gps():
         #set device baud rate
         #baud_base_command = 'PMTK251,'+str(baud) # Globaltop gps
         baud_base_command = 'PUBX,41,1,0007,0003,'+str(baud)+',0' # U-blox neo gps
-        baud_command = calc_checksum_ascii(baud_base_command)
+        baud_command = calc_checksum(baud_base_command)
         logger.info("Setting baud rate to %s: %s" % (baud, baud_command))
         ser.write(baud_command.encode())
         sleep(1)
@@ -105,18 +102,33 @@ def init_gps():
                                'PUBX,40,GSA,0,0,0,0,0,0', 
                                'PUBX,40,GSV,0,0,0,0,0,0'] # U-blox neo gps
         for output_base_command in output_base_commads:
-            output_command = calc_checksum_ascii(output_base_command)
+            output_command = calc_checksum(output_base_command)
             logger.info('setting NMEA output sentence %s' % (output_command))
             ser.write(output_command.encode())
             sleep(1)
 
-        #set sampling frequency
-        fs = str(int(1/gps_freq*1000)) # sampling period in milliseconds
-        fs_base_command = 'PMTK220,'+fs # Globaltop gps
-        fs_command = calc_checksum_ascii(fs_base_command)
+        ## Set sampling frequency
+        # Globaltop gps
+        #fs = str(int(1/gps_freq*1000)) # sampling period in milliseconds
+        #fs_base_command = 'PMTK220,'+fs 
+        #fs_command = calc_checksum(fs_base_command)
+
+        # U-blox neo gps
+        sampling_commands = ['0xB5,0x62,0x06,0x08,0x06,0x00,0xE8,0x03,0x01,0x00,0x01,0x00,0x01,0x39', 
+                             '0xB5,0x62,0x06,0x08,0x06,0x00,0xC8,0x00,0x01,0x00,0x01,0x00,0xDE,0x6A',
+                             '0xB5,0x62,0x06,0x08,0x06,0x00,0x64,0x00,0x01,0x00,0x01,0x00,0x7A,0x12'] # 1, 5, 10 Hz
+        if gps_freq == 10:
+            i = 2
+        elif gps_freq == 5:
+            i = 1
+        else:
+            i = 0
+        fs_command = sampling_commands[i]
+
         logger.info("setting GPS to %s Hz rate: %s" % (gps_freq, fs_command))
         ser.write(fs_command.encode())
         sleep(1)
+
     except Exception as e:
         logger.info(e)
         return ser, False, nmea_time, nmea_date
