@@ -54,7 +54,7 @@ bad = config.getInt('System', 'badValue')
 #IMU parameters
 imuFreq=config.getFloat('IMU', 'imuFreq')
 imu_samples = imuFreq*burst_seconds
-imu_gpio=config.getInt('IMU', 'imu_gpio')
+#imu_gpio=config.getInt('IMU', 'imu_gpio')
 
 #initialize IMU GPIO pin as modem on/off control
 #GPIO.setmode(GPIO.BCM)

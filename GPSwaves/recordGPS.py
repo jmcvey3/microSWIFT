@@ -16,6 +16,16 @@ from time import sleep
 from config3 import Config
 import process_data
 
+def calc_checksum_hex(message):
+    checksum = sum(map(ord, message))
+    return message + '*' + str(checksum) + '\r\n'
+
+def calc_checksum_ascii(message):
+    checksum = 0
+    for char in message:
+        checksum ^= ord(char)
+    checksum = hex(checksum)[2:]
+    return '$' + message + '*' + str(checksum) + '\r\n'
 
 #load config file and get parameters
 configFilename = sys.argv[1] #Load config file/parameters needed
@@ -75,24 +85,31 @@ def init_gps():
 
     try:
         #set device baud rate
-        logger.info("Setting baud rate to %s $PMTK251,%s*1F\r\n" % (baud, baud))
-        baud_command = '$PMTK251'+str(baud)+'*1F\r\n'
+        baud_base_command = 'PMTK251,'+str(baud)
+        baud_command = calc_checksum_ascii(baud_base_command)
+        logger.info("Setting baud rate to %s: %s" % (baud, baud_command))
         ser.write(baud_command.encode())
         sleep(1)
+
         #switch ser port to baud rate
         ser.baudrate=baud
         logger.info("switching to %s on port %s" % (baud, gps_port))
+
         #set output sentence to GPGGA and GPVTG, plus GPRMC once every 4 positions (See GlobalTop PMTK command packet PDF)
-        logger.info('setting NMEA output sentence $PMTK314,0,4,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*2C\r\n')
-        ser.write('$PMTK314,0,4,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*2C\r\n'.encode())
+        output_base_command = 'PMTK314,0,4,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0'
+        output_command = calc_checksum_ascii(output_base_command)
+        logger.info('setting NMEA output sentence %s' % (output_command))
+        ser.write(output_command.encode())
         sleep(1)
+
         #set sampling frequency
         if gps_freq==1:
-            fs = '1000*1F' #set interval to 1000ms (1 Hz) (1000*1F)
+            fs = '1000' #set interval to 1000ms (1 Hz)
         if gps_freq==4:
-            fs = '250*29' #set interval to 250ms (4 Hz) (250*29)
-        logger.info("setting GPS to %s Hz rate $PMTK220,%s\r\n" % (gps_freq, fs))
-        fs_command = '$PMTK220,'+fs+'\r\n'
+            fs = '250' #set interval to 250ms (4 Hz)
+        fs_base_command = 'PMTK220,'+fs
+        fs_command = calc_checksum_ascii(fs_base_command)
+        logger.info("setting GPS to %s Hz rate: %s" % (gps_freq, fs_command))
         ser.write(fs_command.encode())
         sleep(1)
     except Exception as e:
