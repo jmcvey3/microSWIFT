@@ -93,8 +93,8 @@ timeout=80
 [GPS]
 #if PPS is configured on rPi, make sure gpsmon or cgps aren't using this port
 port=/dev/ttyS0
-#115200 -jrm
-baud=9600
+start_baud=9600
+baud=115200
 #gpsGPIO=15
 #GPS reporting rate
 gps_frequency=4

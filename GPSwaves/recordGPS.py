@@ -50,6 +50,7 @@ call_time = config.getInt('Iridium', 'call_time')
 
 #GPS parameters 
 gps_port = config.getString('GPS', 'port')
+start_baud = config.getInt('GPS', 'start_baud')
 baud = config.getInt('GPS', 'baud')
 gps_freq = config.getInt('GPS', 'GPS_frequency') #currently not used, hardcoded at 4 Hz (see init_gps function)
 #numSamplesConst = config.getInt('System', 'numSamplesConst')
@@ -74,7 +75,7 @@ def init_gps():
     try:
         logger.info('initializing GPS')
         logger.info("Trying GPS serial port at %s" % baud)
-        ser=serial.Serial(gps_port,baud,timeout=1)
+        ser=serial.Serial(gps_port,start_baud,timeout=1)
         logger.info("Connected")
     except Exception as e:
         logger.info(e)
@@ -126,6 +127,7 @@ def init_gps():
         fs_command = sampling_commands[i]
 
         logger.info("setting GPS to %s Hz rate: %s" % (gps_freq, fs_command))
+        ser.flush()
         ser.write(fs_command.encode())
         sleep(1)
 
