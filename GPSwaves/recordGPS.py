@@ -115,20 +115,15 @@ def init_gps():
         #fs_command = calc_checksum(fs_base_command)
 
         # U-blox neo gps
-        sampling_commands = ['0xB5,0x62,0x06,0x08,0x06,0x00,0xE8,0x03,0x01,0x00,0x01,0x00,0x01,0x39', 
-                             '0xB5,0x62,0x06,0x08,0x06,0x00,0xC8,0x00,0x01,0x00,0x01,0x00,0xDE,0x6A',
-                             '0xB5,0x62,0x06,0x08,0x06,0x00,0x64,0x00,0x01,0x00,0x01,0x00,0x7A,0x12'] # 1, 5, 10 Hz
-        if gps_freq == 10:
-            i = 2
-        elif gps_freq == 5:
-            i = 1
-        else:
-            i = 0
-        fs_command = sampling_commands[i]
-
+        sampling_commands = {1: b'\xB5\x62\x06\x08\x06\x00\xE8\x03\x01\x00\x01\x00\x01\x39',
+                             2: b'\xB5\x62\x06\x08\x06\x00\xF4\x01\x01\x00\x01\x00\x0B\x77',
+                             4: b'\xB5\x62\x06\x08\x06\x00\xFA\x00\x01\x00\x01\x00\x10\x96',
+                             5: b'\xB5\x62\x06\x08\x06\x00\xC8\x00\x01\x00\x01\x00\xDE\x6A',
+                             10:b'\xB5\x62\x06\x08\x06\x00\x64\x00\x01\x00\x01\x00\x7A\x12',
+        }
+        fs_command = sampling_commands[gps_freq]
         logger.info("setting GPS to %s Hz rate: %s" % (gps_freq, fs_command))
-        ser.flush()
-        ser.write(fs_command.encode())
+        ser.write(fs_command)
         sleep(1)
 
     except Exception as e:
