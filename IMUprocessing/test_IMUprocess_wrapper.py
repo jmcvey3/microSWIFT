@@ -54,7 +54,7 @@ print(nv, axs, ays, azs, gxs, gys, gzs,mxs, mys, mzs, mxo, myo, mzo, Wd, fs)
 # call processIMU
 IMU_results = processIMU_lib.main_processIMU(nv, axs, ays, azs, gxs, gys, gzs, 
                                                  mxs, mys, mzs, mxo, myo, mzo, Wd, fs)
-SigwaveHeight = IMU_results[0]
+Sigwave_Height = IMU_results[0]
 Peakwave_Period = IMU_results[1]
 Peakwave_dirT = IMU_results[2]
 WaveSpectra_Energy = np.squeeze(IMU_results[3])
@@ -65,9 +65,9 @@ WaveSpectra_a2 = np.squeeze(IMU_results[7])
 WaveSpectra_b2 = np.squeeze(IMU_results[8])
 checkdata = WaveSpectra_a1*0+1
 print('IMU results:')
-print('sigwaveHeight=',SigwaveHeight,'peakwave_period=',Peakwave_Period,'peawave_dirT=',Peakwave_dirT)
-print('energy',WaveSpectra_Energy)
-print('freq',WaveSpectra_Freq)
+print('Hs=',Sigwave_Height,'Tp=',Peakwave_Period,'Dp=',Peakwave_dirT)
+print('E',WaveSpectra_Energy)
+print('f',WaveSpectra_Freq)
 print('a1',WaveSpectra_a1)
 print('b1',WaveSpectra_b1)
 print('a2',WaveSpectra_a2)

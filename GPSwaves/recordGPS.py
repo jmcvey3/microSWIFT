@@ -135,7 +135,7 @@ def init_gps():
         #loop until timeout dictated by gps_timeout value (seconds)
         timeout=t.time() + gps_timeout
         while t.time() < timeout:
-            ser.flushInput()
+            ser.flush()
             ser.read_until('\n'.encode())
             newline=ser.readline().decode('utf-8')
             logger.info(newline)
