@@ -77,54 +77,44 @@ def init_gps():
         logger.info("Trying GPS serial port at %s" % baud)
         ser=serial.Serial(gps_port,start_baud,timeout=1)
         logger.info("Connected")
-    except Exception as e:
-        logger.info(e)
-        return ser, False, nmea_time, nmea_date
-
-    try:
-        #set device baud rate
-        #baud_base_command = 'PMTK251,'+str(baud) # Globaltop gps
-        baud_base_command = 'PUBX,41,1,0007,0003,'+str(baud)+',0' # U-blox neo gps
-        baud_command = calc_checksum(baud_base_command)
-        logger.info("Setting baud rate to %s: %s" % (baud, baud_command))
-        ser.write(baud_command.encode())
-        sleep(1)
-
-        #switch ser port to baud rate
-        ser.baudrate=baud
-        logger.info("switching to %s on port %s" % (baud, gps_port))
-
-        #set output sentence to GPGGA and GPVTG, plus GPRMC once every 4 positions (See GlobalTop PMTK command packet PDF)
-        #output_base_command = 'PMTK314,0,4,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0' # Globaltop gps
-        output_base_commads = ['PUBX,40,GLL,0,0,0,0,0,0',
-                               'PUBX,40,RMC,4,4,0,0,0,0',
-                               'PUBX,40,VTG,1,1,0,0,0,0',
-                               'PUBX,40,GGA,1,1,0,0,0,0',
-                               'PUBX,40,GSA,0,0,0,0,0,0', 
-                               'PUBX,40,GSV,0,0,0,0,0,0'] # U-blox neo gps
-        for output_base_command in output_base_commads:
-            output_command = calc_checksum(output_base_command)
-            logger.info('setting NMEA output sentence %s' % (output_command))
-            ser.write(output_command.encode())
+        try:
+            #set device baud rate
+            baud_base_command = 'PUBX,41,1,0007,0003,'+str(baud)+',0'
+            baud_command = calc_checksum(baud_base_command)
+            logger.info("Setting baud rate to %s: %s" % (baud, baud_command))
+            ser.write(baud_command.encode())
             sleep(1)
 
-        ## Set sampling frequency
-        # Globaltop gps
-        #fs = str(int(1/gps_freq*1000)) # sampling period in milliseconds
-        #fs_base_command = 'PMTK220,'+fs 
-        #fs_command = calc_checksum(fs_base_command)
+            #switch ser port to baud rate
+            ser.baudrate=baud
+            logger.info("switching to %s on port %s" % (baud, gps_port))
 
-        # U-blox neo gps
-        sampling_commands = {1: b'\xB5\x62\x06\x08\x06\x00\xE8\x03\x01\x00\x01\x00\x01\x39',
-                             2: b'\xB5\x62\x06\x08\x06\x00\xF4\x01\x01\x00\x01\x00\x0B\x77',
-                             4: b'\xB5\x62\x06\x08\x06\x00\xFA\x00\x01\x00\x01\x00\x10\x96',
-                             5: b'\xB5\x62\x06\x08\x06\x00\xC8\x00\x01\x00\x01\x00\xDE\x6A',
-                             10:b'\xB5\x62\x06\x08\x06\x00\x64\x00\x01\x00\x01\x00\x7A\x12',
-        }
-        fs_command = sampling_commands[gps_freq]
-        logger.info("setting GPS to %s Hz rate: %s" % (gps_freq, fs_command))
-        ser.write(fs_command)
-        sleep(1)
+            output_base_commads = ['PUBX,40,GLL,0,0,0,0,0,0',
+                                'PUBX,40,RMC,4,4,0,0,0,0',
+                                'PUBX,40,VTG,1,1,0,0,0,0',
+                                'PUBX,40,GGA,1,1,0,0,0,0',
+                                'PUBX,40,GSA,0,0,0,0,0,0', 
+                                'PUBX,40,GSV,0,0,0,0,0,0']
+            for output_base_command in output_base_commads:
+                output_command = calc_checksum(output_base_command)
+                logger.info('setting NMEA output sentence %s' % (output_command))
+                ser.write(output_command.encode())
+                sleep(1)
+
+            ## Set sampling frequency
+            sampling_commands = {1: b'\xB5\x62\x06\x08\x06\x00\xE8\x03\x01\x00\x01\x00\x01\x39',
+                                2: b'\xB5\x62\x06\x08\x06\x00\xF4\x01\x01\x00\x01\x00\x0B\x77',
+                                4: b'\xB5\x62\x06\x08\x06\x00\xFA\x00\x01\x00\x01\x00\x10\x96',
+                                5: b'\xB5\x62\x06\x08\x06\x00\xC8\x00\x01\x00\x01\x00\xDE\x6A',
+                                10:b'\xB5\x62\x06\x08\x06\x00\x64\x00\x01\x00\x01\x00\x7A\x12',
+            }
+            fs_command = sampling_commands[gps_freq]
+            logger.info("setting GPS to %s Hz rate: %s" % (gps_freq, fs_command))
+            ser.write(fs_command)
+            sleep(1)
+        except Exception as e:
+            logger.info(e)
+            return ser, False, nmea_time, nmea_date
 
     except Exception as e:
         logger.info(e)
@@ -149,45 +139,48 @@ def init_gps():
                     #check gps_qual value from GPGGS sentence. 0=invalid,1=GPS fix,2=DGPS fix
                     if gpgga.gps_qual > 0:
                         logger.info('GPS fix acquired')
-                        # I'm setting system time using PPS - jrm
-                        #get date and time from GPRMC sentence - GPRMC reported only once every 8 lines
-                        #for i in range(8):
-                        #	newline=ser.readline().decode('utf-8')
-                        #	if 'GPRMC' in newline:
-                        #		logger.info('found GPRMC sentence')
-                        #		try:
-                        #			gprmc=pynmea2.parse(newline)
-                        #			nmea_time=gprmc.timestamp
-                        #			nmea_date=gprmc.datestamp
-                        #			logger.info("nmea time: %s" %nmea_time)
-                        #			logger.info("nmea date: %s" %nmea_date)
-                        #			
-                        #			#set system time
-                        #			try:
-                        #				logger.info("setting system time from GPS: %s %s" %(nmea_date, nmea_time))
-                        #				os.system('sudo timedatectl set-timezone UTC')
-                        #				os.system('sudo date -s "%s %s"' %(nmea_date, nmea_time))
-                        #				os.system('sudo hwclock -w')
-                        #				
-                        logger.info("GPS initialized")
-                        return ser, True, nmea_time, nmea_date
-                        #			except Exception as e:
-                        #				logger.info(e)
-                        #				logger.info('error setting system time')
-                        #				continue	
-                        #		except Exception as e:
-                        #			logger.info(e)
-                        #			logger.info('error parsing nmea sentence')
-                        #			continue
-                        #return False if gps fix but time not set	
-                        #return ser, False, nmea_time, nmea_date
+                        # get date and time from GPRMC sentence - GPRMC reported only once every second
+                        # 8 lines at 4 Hz (GGA + VTG)
+                        for i in range(2*gps_freq):
+                            newline=ser.readline().decode('utf-8')
+                            if 'GPRMC' in newline:
+                                logger.info('found GPRMC sentence')
+
+                                try:
+                                    gprmc=pynmea2.parse(newline)
+                                    nmea_time=gprmc.timestamp
+                                    nmea_date=gprmc.datestamp
+                                    logger.info("nmea time: %s" %nmea_time)
+                                    logger.info("nmea date: %s" %nmea_date)
+                                    
+                                    #set system time
+                                    try:
+                                        logger.info("setting system time from GPS: %s %s" %(nmea_date, nmea_time))
+                                        os.system('sudo timedatectl set-timezone UTC')
+                                        os.system('sudo date -s "%s %s"' %(nmea_date, nmea_time))
+                                        #os.system('sudo hwclock -w --verbose') # external RTC
+                        				
+                                        logger.info("GPS initialized")
+                                        return ser, True, nmea_time, nmea_date
+
+                                    except Exception as e:
+                                        logger.info(e)
+                                        logger.info('error setting system time')
+                                        continue	
+                                except Exception as e:
+                                    logger.info(e)
+                                    logger.info('error parsing nmea sentence')
+                                    continue
+                        # return False if gps fix but time not set	
+                        return ser, False, nmea_time, nmea_date
             sleep(1)
         #return False if loop is allowed to timeout
         return ser, False, nmea_time, nmea_date
     except Exception as e:
+        logger.info("Error setting up GPS")
         logger.info(e)
         return ser, False, nmea_time, nmea_date
-    
+
 #------------------------------------------------------------------------------------------------------
 #------------------------------------------------------------------------------------------------------
 def record_gps(ser,fname):
