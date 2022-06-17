@@ -145,7 +145,7 @@ def process_imu_thread(filename):
     now=datetime.utcnow()
     telem_file = dataDir + floatID+'_TXimu_'+"{:%d%b%Y_%H%M%SUTC.dat}".format(now)
     with open(telem_file, 'w', newline='\n') as fp:
-        fp.write('Hs,Tp,Dp,E,f,a1,b1,a2,b2\n')
+        fp.write('Hs,Tp,Dp,E,f,a1,b1,a2,b2,checkdata\n')
         fp.write(str(Hs)+'\n')
         fp.write(str(Tp)+'\n')
         fp.write(str(Dp)+'\n')

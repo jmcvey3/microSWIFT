@@ -120,27 +120,40 @@ def main(u,v,z,lat,lon):
     #get last good lattitude and longitude value from burst
     lat = _get_last(badValue, lat)
     lon = _get_last(badValue, lon)
+
+    Hs = round(Hs,6)
+    Tp = round(Tp,6)
+    Dp = round(Dp,6)
+    lat = round(lat,6)
+    lon = round(lon,6)
+    uMean = round(uMean,6)
+    vMean = round(vMean,6)
+    zMean = round(zMean,6)
     
     #file name for telemetry file (e.g. '/home/pi/microSWIFT/data/microSWIFT001_TX_01Jan2021_080000UTC.dat')
     now=datetime.utcnow()
     telem_file = dataDir + floatID+'_TX_'+"{:%d%b%Y_%H%M%SUTC.dat}".format(now)
     logger.info('telemetry file = %s' % telem_file)
 
+    gps_file = dataDir + floatID+'_TXgps_'+"{:%d%b%Y_%H%M%SUTC.dat}".format(now)
+    with open(gps_file, 'w', newline='\n') as fp:
+        fp.write('Hs,Tp,Dp,E,f,a1,b1,a2,b2,checkdata\n')
+        fp.write(str(Hs)+'\n')
+        fp.write(str(Tp)+'\n')
+        fp.write(str(Dp)+'\n')
+        fp.write(','.join(E.round(6).astype(str))+'\n')
+        fp.write(','.join(f.round(6).astype(str))+'\n')
+        fp.write(','.join(a1.round(6).astype(str))+'\n')
+        fp.write(','.join(b1.round(6).astype(str))+'\n')
+        fp.write(','.join(a2.round(6).astype(str))+'\n')
+        fp.write(','.join(b2.round(6).astype(str))+'\n')
+        fp.write(','.join(checkdata.astype(str))+'\n')
+
     with open(telem_file, 'wb') as file:
         logger.info('create telemetry file: {}'.format(telem_file))
         
-        
         #payload size in bytes: 16 4-byte floats, 7 arrays of 42 4-byte floats, three 1-byte ints, and one 2-byte int   
         #payload_size = (16 + 7*42) * 4 + 5
-    
-        Hs = round(Hs,6)
-        Tp = round(Tp,6)
-        Dp = round(Dp,6)
-        lat = round(lat,6)
-        lon = round(lon,6)
-        uMean = round(uMean,6)
-        vMean = round(vMean,6)
-        zMean = round(zMean,6)
         
         #ignore temp and voltage for now
         temp = 0.0

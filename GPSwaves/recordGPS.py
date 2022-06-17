@@ -9,8 +9,8 @@ from datetime import datetime
 import time as t
 import RPi.GPIO as GPIO
 import pynmea2
-import struct
 from time import sleep
+import threading
 
 #my imports
 from config3 import Config
@@ -186,6 +186,7 @@ def init_gps():
 def record_gps(ser,fname):
 
     #initialize empty numpy array and fill with bad values
+    ts = []
     u = np.empty(gps_samples)
     u.fill(badValue)
     v = np.empty(gps_samples)
@@ -209,7 +210,6 @@ def record_gps(ser,fname):
             while t.time() <= t_end or ipos < gps_samples or ivel < gps_samples:
                 newline=ser.readline().decode()
                 gps_out.write(newline)
-                gps_out.flush()
         
                 if "GPGGA" in newline:
                     gpgga = pynmea2.parse(newline,check=True)   #grab gpgga sentence and parse
@@ -220,6 +220,7 @@ def record_gps(ser,fname):
                         sleep(10)
                         ipos+=1
                         continue
+                    ts.append(gpgga.timestamp.strftime("%H:%M:%S.%f"))
                     z[ipos] = gpgga.altitude #units are meters
                     lat[ipos] = gpgga.latitude
                     lon[ipos] = gpgga.longitude
@@ -251,7 +252,18 @@ def record_gps(ser,fname):
         
     except Exception as e:
         logger.info(e, exc_info=True)
-        return u,v,z,lat,lon
+        return u,v,z,lat,lon,ts
+
+
+#------------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------------------------------
+def process_gps_thread(fname,u,v,z,lat,lon,ts):
+    # overwrite gps nmea file with data
+    with open(fname,'w', newline='\n') as fp:
+        for i in range(len(u)):
+            fp.write('%s,%f,%f,%f,%f,%f\n' %(ts[i],u[i],v[i],z[i],lat[i],lon[i]))
+
+    process_data.main(u,v,z,lat,lon)
 
 
 #------------------------------------------------------------------------------------------------------
@@ -296,17 +308,21 @@ if __name__ == "__main__":
                 fname = dataDir + floatID + '_GPS_'+"{:%d%b%Y_%H%M%SUTC.dat}".format(datetime.utcnow())
                 logger.info("file name: %s" %fname)
                 #call record_gps	
-                u,v,z,lat,lon = record_gps(ser,fname)
+                u,v,z,lat,lon,ts = record_gps(ser,fname)
                 
-                #check if burst completed with 2048 poi
-                if sum(u):
+                try:
                     if os.path.isfile(fname) and os.path.getsize(fname) > 0:
                         #call data processing script
                         logger.info('starting to process data')
                         #print(u.shape)
-                        process_data.main(u,v,z,lat,lon)
+                        x_gps = threading.Thread(target=process_gps_thread, args=(fname,u,v,z,lat,lon,ts), daemon=True)
+                        x_gps.start()
                     else:
                         logger.info('data file does not exist or does not contain enough data for processing')	
+                except OSError as e:
+                    logger.info(e)
+                    sys.exit(1)
+
             else:
                 sleep(0.25)
     else:
