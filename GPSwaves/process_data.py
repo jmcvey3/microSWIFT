@@ -142,7 +142,7 @@ def main(u,v,z,lat,lon):
         fp.write(str(Tp)+'\n')
         fp.write(str(Dp)+'\n')
         fp.write(','.join(E.round(6).astype(str))+'\n')
-        fp.write(','.join(f.round(6).astype(str))+'\n')
+        fp.write(','.join(f.astype(str))+'\n')
         fp.write(','.join(a1.round(6).astype(str))+'\n')
         fp.write(','.join(b1.round(6).astype(str))+'\n')
         fp.write(','.join(a2.round(6).astype(str))+'\n')
