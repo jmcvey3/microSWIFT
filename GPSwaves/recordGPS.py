@@ -79,7 +79,7 @@ def init_gps():
         logger.info("Connected")
         try:
             #set device baud rate
-            baud_base_command = 'PUBX,41,1,0007,0003,'+str(baud)+',0'
+            baud_base_command = 'PMTK251,'+str(baud)
             baud_command = calc_checksum(baud_base_command)
             logger.info("Setting baud rate to %s: %s" % (baud, baud_command))
             ser.write(baud_command.encode())
@@ -89,28 +89,19 @@ def init_gps():
             ser.baudrate=baud
             logger.info("switching to %s on port %s" % (baud, gps_port))
 
-            output_base_commads = ['PUBX,40,GLL,0,0,0,0,0,0',
-                                'PUBX,40,RMC,4,4,0,0,0,0',
-                                'PUBX,40,VTG,1,1,0,0,0,0',
-                                'PUBX,40,GGA,1,1,0,0,0,0',
-                                'PUBX,40,GSA,0,0,0,0,0,0', 
-                                'PUBX,40,GSV,0,0,0,0,0,0']
-            for output_base_command in output_base_commads:
-                output_command = calc_checksum(output_base_command)
-                logger.info('setting NMEA output sentence %s' % (output_command))
-                ser.write(output_command.encode())
-                sleep(1)
-
+            ## Set output sentence to GPGGA and GPVTG, plus GPRMC once every 4 positions (See GlobalTop PMTK command packet PDF)
+            output_base_command = 'PMTK314,0,4,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0'
+            output_command = calc_checksum(output_base_command)
+            logger.info('setting NMEA output sentence %s' % (output_command))
+            ser.write(output_command.encode())
+            sleep(1)
+        
             ## Set sampling frequency
-            sampling_commands = {1: b'\xB5\x62\x06\x08\x06\x00\xE8\x03\x01\x00\x01\x00\x01\x39',
-                                2: b'\xB5\x62\x06\x08\x06\x00\xF4\x01\x01\x00\x01\x00\x0B\x77',
-                                4: b'\xB5\x62\x06\x08\x06\x00\xFA\x00\x01\x00\x01\x00\x10\x96',
-                                5: b'\xB5\x62\x06\x08\x06\x00\xC8\x00\x01\x00\x01\x00\xDE\x6A',
-                                10:b'\xB5\x62\x06\x08\x06\x00\x64\x00\x01\x00\x01\x00\x7A\x12',
-            }
-            fs_command = sampling_commands[gps_freq]
+            fs = str(int(1/gps_freq*1000)) # sampling period in milliseconds
+            fs_base_command = 'PMTK220,'+fs
+            fs_command = calc_checksum(fs_base_command)
             logger.info("setting GPS to %s Hz rate: %s" % (gps_freq, fs_command))
-            ser.write(fs_command)
+            ser.write(fs_command.encode())
             sleep(1)
         except Exception as e:
             logger.info(e)
