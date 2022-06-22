@@ -199,7 +199,7 @@ def record_gps(ser,fname):
     lon.fill(badValue)
     
     try:
-        ser.flushInput()
+        ser.flush()
         with open(fname, 'w',newline='\n') as gps_out:
             
             logger.info('open file for writing: %s' %fname)
