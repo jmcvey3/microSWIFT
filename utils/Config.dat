@@ -101,7 +101,8 @@ gps_frequency=4
 timeout=360
 #========================== IMU Parameters ========================
 [IMU]
-imuFreq=12.5
+port=/dev/ttyACM0
+imuFreq=4
 #imu_gpio=20
 
 #===================== Temperature Parameters =====================
