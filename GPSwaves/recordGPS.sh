@@ -18,4 +18,4 @@ export PYTHONPATH=$PYTHONPATH/$GPSwavesDir:/$utilsDir
 #=================================================================================
 
 echo " --- RUN RECORD AND SEND GPS APP ---"
-python3 /home/pi/microSWIFT/GPSwaves/recordGPS.py $config &
+python3 recordGPS.py $config &

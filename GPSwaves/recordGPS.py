@@ -115,11 +115,17 @@ def init_gps():
     try:
         #loop until timeout dictated by gps_timeout value (seconds)
         timeout=t.time() + gps_timeout
+        logger.info("Waiting for GPS lock")
         while t.time() < timeout:
             ser.flush()
             ser.read_until('\n'.encode())
             newline=ser.readline().decode('utf-8')
-            logger.info(newline)
+
+            if newline=='':
+                pass
+            else:
+                logger.info(newline)
+
             if not 'GPGGA' in newline:
                 newline=ser.readline().decode('utf-8')
                 if 'GPGGA' in newline:
