@@ -2,7 +2,7 @@
 
 #standard imports 
 import time, os, sys
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 import serial
 from logging import *
@@ -59,23 +59,37 @@ imu_fs_period = int(1/imuFreq * 1e6) # sampling period in microseconds
 #------------------------------------------------------------
 #Yost IMU setup
 # open serial port
-ser = serial.Serial(port=imu_port,baudrate=115200)
+ser = serial.Serial(port=imu_port, baudrate=115200)
 # serial commands
-ser.write(':80,0,45,38,39,40,255,255,255\r\n'.encode()) # sensor config
-ser.write(':82,{},-1,0\r\n'.format(imu_fs_period).encode()) # timing
-ser.write(':85\r\n'.encode()) # start
+ser.write(':86\r\n'.encode('ascii')) # stop running
+time.sleep(1)
+ser.write(':80,0,38,39,40,45,255,255,255\r\n'.encode('ascii')) # sensor config
+time.sleep(0.1)
+ser.write((':82,{},-1,0\r\n'.format(imu_fs_period)).encode('ascii')) # timing
+time.sleep(0.1)
+# Sanity check on sampling rate
+ser.write(':83\r\n'.encode('ascii')) # get timing
+time.sleep(0.1)
+assert ser.in_waiting==13
+timing = ser.read(13).decode()
+assert int(timing[0:6])==imu_fs_period
+time.sleep(5)
+
+# There appears to be a time delay between setting the sampling rate 
+# and the sampling rate actually being set - starting and stopping IMU 
+# w/i while loop
 #---------------------------------------------------------------
  
 
-def process_imu_thread(filename):
+def process_imu_thread(filename, logger):
     #filename = "../data/raspberrypi_IMU_19Mar2022_042500UTC.dat"
     with open(filename, 'r') as fp:
         data = list(csv.reader(fp, delimiter=','))
     IMUdata = np.array(data)
 
-    axs = IMUdata[:,1]*9.81 # accelerometer
-    ays = IMUdata[:,2]*9.81
-    azs = IMUdata[:,3]*9.81
+    axs = IMUdata[:,1] # accelerometer
+    ays = IMUdata[:,2]
+    azs = IMUdata[:,3]
     gxs = IMUdata[:,4] # gyro
     gys = IMUdata[:,5]
     gzs = IMUdata[:,6]
@@ -117,7 +131,7 @@ def process_imu_thread(filename):
 
     dataDir = config.getString('System', 'dataDir')
     floatID = os.uname()[1]
-    now=datetime.utcnow()
+    now=datetime.utcnow() - timedelta(minutes=5) # so that raw and processed timestamps match
     telem_file = dataDir + floatID+'_TXimu_'+"{:%d%b%Y_%H%M%SUTC.dat}".format(now)
     with open(telem_file, 'w', newline='\n') as fp:
         fp.write('Hs,Tp,Dp,E,f,a1,b1,a2,b2,checkdata\n')
@@ -132,7 +146,7 @@ def process_imu_thread(filename):
         fp.write(','.join(b2.astype(str))+'\n')
         fp.write(','.join(checkdata.astype(str))+'\n')
 
-    logger.info('data processing complete')
+    logger.info('Data processing complete')
 
 
 # Main loop will read the acceleration and magnetometer values every second
@@ -145,66 +159,56 @@ tStart = time.time()
 #-------------------------------------------------------------------------------
 logger.info('---------------recordIMU.py------------------')
 while True:
-    
-    
+    ser.write(':85\r\n'.encode('ascii')) # start IMU
     now=datetime.utcnow()
-    if  now.minute == burst_time or now.minute % burst_interval == 0 and now.second == 0:
-        
-
-        #Get data
-        # pull serial data (written in lines, not bytes)
-        data0 = ser.readline()
-        data45 = ser.readline()
-        data38 = ser.readline()
-        data39 = ser.readline()
-        data40 = ser.readline()
-        
-        
-        logger.info('starting burst')
+    if now.minute == burst_time or now.minute % burst_interval == 0 and now.second == 0:
+        logger.info('Starting burst')
         
         #create new file for new burst interval 
         fname = dataDir + floatID + '_IMU_'+'{:%d%b%Y_%H%M%SUTC.dat}'.format(datetime.utcnow())
-        logger.info('file name: %s' %fname)
-             
+        logger.info('File name: %s' %fname)
+        
         with open(fname, 'w', newline='\n') as imu_out:
-            logger.info('open file for writing: %s' %fname)
+            logger.info('Open file for writing: %s' %fname)
             t_end = time.time() + burst_seconds #get end time for burst
             isample=0
+            
             while time.time() <= t_end or isample < imu_samples:
-        
                 try:
-                    gyro_x, gyro_y, gyro_z = data38
-                    accel_x, accel_y, accel_z = data39
-                    mag_x, mag_y, mag_z = data40
-                    
+                    # Get data
+                    timestamp='{:%Y-%m-%d %H:%M:%S.%f}'.format(datetime.utcnow())
+                    data0 = ser.readline().decode()
+                    data38 = ser.readline().decode()
+                    data39 = ser.readline().decode()
+                    data40 = ser.readline().decode()
+                    data45 = ser.readline().decode()
+ 
                 except Exception as e:
                     logger.info(e)
-                    logger.info('error reading IMU data')
-         
-                timestamp='{:%Y-%m-%d %H:%M:%S}'.format(datetime.utcnow())
+                    logger.info("Error reading IMU data")
 
-                info = { 'gyro':data38, 'accel':data39, 'comp':data40, \
-                    'quat':data0,'conf_fac':data45, }
+                gyro_x, gyro_y, gyro_z = [float(x) for x in data38.split(',')]
+                accel_x, accel_y, accel_z = [float(x)*9.81 for x in data39.split(',')]
+                mag_x, mag_y, mag_z = [float(x) for x in data40.split(',')]
+                q_x, q_y, q_z, q_w = [float(x) for x in data0.split(',')]
+                conf = float(data45)
 
-                imu_out.write('%s,%f\n' %(timestamp,info))
-                imu_out.flush()
-        
+                imu_out.write('%s,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n' %(timestamp,accel_x,accel_y,accel_z,mag_x,mag_y,mag_z,gyro_x,gyro_y,gyro_z,q_x,q_y,q_z,q_w,conf))
+
                 isample = isample + 1
-                
-               
+
                 if time.time() >= t_end and 0 < imu_samples-isample <= 40:
                     continue
                 elif time.time() > t_end and imu_samples-isample > 40:
                     break
-            
-            logger.info('end burst')
+
+            ser.write(':86\r\n'.encode('ascii')) # stop running
+            logger.info('End burst')
             logger.info('IMU samples %s' %isample)  
-            #turn imu off
-            logger.info('power down IMU')
 
         # Start IMU processing
         logger.info('Start processing')
-        x1 = threading.Thread(target=process_imu_thread, args=([fname]), daemon=True)
+        x1 = threading.Thread(target=process_imu_thread, args=(fname, logger,), daemon=True)
         x1.start()
 
-#potentially ser.close()
+        time.sleep(0.1)

@@ -54,7 +54,7 @@ imu_samples = imuFreq*burst_seconds
 #------------------------------------------------------------
 #Yost iMU setup
 # open serial port
-ser = serial.Serial(port='COM7',baudrate=115200)
+ser = serial.Serial(port='/dev/ttyACM0',baudrate=115200)
 # serial commands
 ser.write(':80,0,45,65,66,67,255,255,255\r\n'.encode()) # sensor config
 ser.write(':82,250000,-1,0\r\n'.encode()) # timing

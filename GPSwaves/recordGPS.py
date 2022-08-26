@@ -239,7 +239,7 @@ def record_gps(ser,fname):
         logger.info('number of GPVTG samples = %s' %ivel)
         logger.info('number of bad samples %d' %badpts)
                         
-        return u,v,z,lat,lon
+        return u,v,z,lat,lon,ts
         
     except Exception as e:
         logger.info(e, exc_info=True)
