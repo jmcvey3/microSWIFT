@@ -13,7 +13,7 @@ import sys, os
 import numpy as np
 from struct import *
 from logging import *
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import struct
 from time import sleep
@@ -131,7 +131,7 @@ def main(u,v,z,lat,lon):
     zMean = round(zMean,6)
     
     #file name for telemetry file (e.g. '/home/pi/microSWIFT/data/microSWIFT001_TX_01Jan2021_080000UTC.dat')
-    now=datetime.utcnow()
+    now=datetime.utcnow() - timedelta(minutes=5) # so that raw and processed timestamps match
     telem_file = dataDir + floatID+'_TX_'+"{:%d%b%Y_%H%M%SUTC.dat}".format(now)
     logger.info('telemetry file = %s' % telem_file)
 
@@ -149,95 +149,94 @@ def main(u,v,z,lat,lon):
         fp.write(','.join(b2.round(6).astype(str))+'\n')
         fp.write(','.join(checkdata.astype(str))+'\n')
 
-    with open(telem_file, 'wb') as file:
-        logger.info('create telemetry file: {}'.format(telem_file))
+    # with open(telem_file, 'wb') as file:
+    #     logger.info('create telemetry file: {}'.format(telem_file))
         
-        #payload size in bytes: 16 4-byte floats, 7 arrays of 42 4-byte floats, three 1-byte ints, and one 2-byte int   
-        #payload_size = (16 + 7*42) * 4 + 5
+    #     #payload size in bytes: 16 4-byte floats, 7 arrays of 42 4-byte floats, three 1-byte ints, and one 2-byte int   
+    #     #payload_size = (16 + 7*42) * 4 + 5
         
-        #ignore temp and voltage for now
-        temp = 0.0
-        volt = 0.0
+    #     #ignore temp and voltage for now
+    #     temp = 0.0
+    #     volt = 0.0
         
-        logger.info('Hs: {0} Tp: {1} Dp: {2} lat: {3} lon: {4} temp: {5} volt: {6} uMean: {7} vMean: {8} zMean: {9}'.format(
-            Hs, Tp, Dp, lat, lon, temp, volt, uMean, vMean, zMean))
+    #     logger.info('Hs: {0} Tp: {1} Dp: {2} lat: {3} lon: {4} temp: {5} volt: {6} uMean: {7} vMean: {8} zMean: {9}'.format(
+    #         Hs, Tp, Dp, lat, lon, temp, volt, uMean, vMean, zMean))
 
-        if sensor_type == 50:
+    #     if sensor_type == 50:
 
-        #create formatted struct with all payload data
-            now=datetime.now()
-            payload_size = struct.calcsize('<sbbhfff42f42f42f42f42f42f42ffffffffiiiiii')
-            payload_data = (struct.pack('<sbbhfff', str(payload_type).encode(),sensor_type,port, payload_size,Hs,Tp,Dp) + 
-                            struct.pack('<42f', *E) +
-                            struct.pack('<42f', *f) +
-                            struct.pack('<42f', *a1) +
-                            struct.pack('<42f', *b1) +
-                            struct.pack('<42f', *a2) +
-                            struct.pack('<42f', *b2) +
-                            struct.pack('<42f', *checkdata) +
-                            struct.pack('<f', lat) +
-                            struct.pack('<f', lon) +
-                            struct.pack('<f', temp) +
-                            struct.pack('<f', volt) +
-                            struct.pack('<f', uMean) +
-                            struct.pack('<f', vMean) +
-                            struct.pack('<f', zMean) +
-                            struct.pack('<i', int(now.year)) +
-                            struct.pack('<i', int(now.month)) +
-                            struct.pack('<i', int(now.day)) +
-                            struct.pack('<i', int(now.hour)) +
-                            struct.pack('<i', int(now.minute)) +
-                            struct.pack('<i', int(now.second)))
+    #     #create formatted struct with all payload data
+    #         now=datetime.now()
+    #         payload_size = struct.calcsize('<sbbhfff42f42f42f42f42f42f42ffffffffiiiiii')
+    #         payload_data = (struct.pack('<sbbhfff', str(payload_type).encode(),sensor_type,port, payload_size,Hs,Tp,Dp) + 
+    #                         struct.pack('<42f', *E) +
+    #                         struct.pack('<42f', *f) +
+    #                         struct.pack('<42f', *a1) +
+    #                         struct.pack('<42f', *b1) +
+    #                         struct.pack('<42f', *a2) +
+    #                         struct.pack('<42f', *b2) +
+    #                         struct.pack('<42f', *checkdata) +
+    #                         struct.pack('<f', lat) +
+    #                         struct.pack('<f', lon) +
+    #                         struct.pack('<f', temp) +
+    #                         struct.pack('<f', volt) +
+    #                         struct.pack('<f', uMean) +
+    #                         struct.pack('<f', vMean) +
+    #                         struct.pack('<f', zMean) +
+    #                         struct.pack('<i', int(now.year)) +
+    #                         struct.pack('<i', int(now.month)) +
+    #                         struct.pack('<i', int(now.day)) +
+    #                         struct.pack('<i', int(now.hour)) +
+    #                         struct.pack('<i', int(now.minute)) +
+    #                         struct.pack('<i', int(now.second)))
             
-            #run send_sbd script to send telemetry file
-            send_sbd.send_microSWIFT_50(payload_data)
-            logger.info('data processing complete')
+    #         #run send_sbd script to send telemetry file
+    #         send_sbd.send_microSWIFT_50(payload_data)
+    #         logger.info('data processing complete')
         
-        elif sensor_type == 51:
+    #     elif sensor_type == 51:
             
-            #compute fmin fmax and fstep
-            fmin = np.min(f)
-            fmax = np.max(f)
-            fstep = (fmax - fmin)/41
+    #         #compute fmin fmax and fstep
+    #         fmin = np.min(f)
+    #         fmax = np.max(f)
+    #         fstep = (fmax - fmin)/41
             
-            now=datetime.now()
-            payload_size = struct.calcsize('<sbbhfff42fffffffffffiiiiii')
-            payload_data = (struct.pack('<sbbhfff', str(payload_type).encode(),sensor_type,port, payload_size,Hs,Tp,Dp) + 
-                            struct.pack('<42f', *E) +
-                            struct.pack('<f', fmin) +
-                            struct.pack('<f', fmax) +
-                            struct.pack('<f', fstep) +
-                            struct.pack('<f', lat) +
-                            struct.pack('<f', lon) +
-                            struct.pack('<f', temp) +
-                            struct.pack('<f', volt) +
-                            struct.pack('<f', uMean) +
-                            struct.pack('<f', vMean) +
-                            struct.pack('<f', zMean) +
-                            struct.pack('<i', int(now.year)) +
-                            struct.pack('<i', int(now.month)) +
-                            struct.pack('<i', int(now.day)) +
-                            struct.pack('<i', int(now.hour)) +
-                            struct.pack('<i', int(now.minute)) +
-                            struct.pack('<i', int(now.second)))
+    #         now=datetime.now()
+    #         payload_size = struct.calcsize('<sbbhfff42fffffffffffiiiiii')
+    #         payload_data = (struct.pack('<sbbhfff', str(payload_type).encode(),sensor_type,port, payload_size,Hs,Tp,Dp) + 
+    #                         struct.pack('<42f', *E) +
+    #                         struct.pack('<f', fmin) +
+    #                         struct.pack('<f', fmax) +
+    #                         struct.pack('<f', fstep) +
+    #                         struct.pack('<f', lat) +
+    #                         struct.pack('<f', lon) +
+    #                         struct.pack('<f', temp) +
+    #                         struct.pack('<f', volt) +
+    #                         struct.pack('<f', uMean) +
+    #                         struct.pack('<f', vMean) +
+    #                         struct.pack('<f', zMean) +
+    #                         struct.pack('<i', int(now.year)) +
+    #                         struct.pack('<i', int(now.month)) +
+    #                         struct.pack('<i', int(now.day)) +
+    #                         struct.pack('<i', int(now.hour)) +
+    #                         struct.pack('<i', int(now.minute)) +
+    #                         struct.pack('<i', int(now.second)))
             
-            #run send_sbd script to send telemetry file
-            send_sbd.send_microSWIFT_51(payload_data)
-            logger.info('data processing complete')
+    #         #run send_sbd script to send telemetry file
+    #         send_sbd.send_microSWIFT_51(payload_data)
+    #         logger.info('data processing complete')
         
-        else: 
-            logger.info('invalid sensor type: {}'.format(sensor_type))
-            logger.info('exiting')
-            sys.exit(1)
+    #     else: 
+    #         logger.info('invalid sensor type: {}'.format(sensor_type))
+    #         logger.info('exiting')
+    #         sys.exit(1)
         
         
+    #     logger.info('writing data to file')
+    #     file.write(payload_data)
+    #     logger.info('done')
+    #     file.flush()
         
-        logger.info('writing data to file')
-        file.write(payload_data)
-        logger.info('done')
-        file.flush()
-        
-    return payload_data
+    # return payload_data
 
 def _getuvzMean(badValue, pts):
     mean = badValue     #set values to 999 initially and fill if valid values

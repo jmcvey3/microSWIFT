@@ -81,31 +81,34 @@ time.sleep(5)
 #---------------------------------------------------------------
  
 
-def process_imu_thread(filename, logger):
+def process_imu_thread(filename, logger, imuFreq):
     #filename = "../data/raspberrypi_IMU_19Mar2022_042500UTC.dat"
     with open(filename, 'r') as fp:
         data = list(csv.reader(fp, delimiter=','))
-    IMUdata = np.array(data)
+    IMUdata = np.array(data)[:,1:-5].astype(float) # grab all data except time, quaternions and check
 
-    axs = IMUdata[:,1] # accelerometer
+    # Yost defines y and z axes incorrectly (doesn't follow right hand rule)
+    # processIMU_lib detrends these
+    axs = IMUdata[:,0]  # accelerometer
     ays = IMUdata[:,2]
-    azs = IMUdata[:,3]
-    gxs = IMUdata[:,4] # gyro
+    azs = IMUdata[:,1]
+    gxs = IMUdata[:,3]  # gyro
     gys = IMUdata[:,5]
-    gzs = IMUdata[:,6]
-    mxs = IMUdata[:,7] # magnetometer
+    gzs = IMUdata[:,4]
+    mxs = IMUdata[:,6] # magnetometer
     mys = IMUdata[:,8]
-    mzs = IMUdata[:,9]
+    mzs = IMUdata[:,7]
 
     mxo = np.double(0.) # magn calibration data (Yost self-calibrates)
     myo = np.double(0.) 
     mzo = np.double(0.)  
     Wd = np.double(0.) 
-    fs = np.double(4.) # sampling frequency
+    fs = np.double(imuFreq) # sampling frequency
 
     nv=np.size(axs)
 
     # call processIMU
+    # Requires at least 2048 data points at 4 Hz apparently, so at least 8:42 of data
     IMU_results = processIMU_lib.main_processIMU(nv, axs, ays, azs, gxs, gys, gzs, 
                                                     mxs, mys, mzs, mxo, myo, mzo, Wd, fs)
                                                     
@@ -188,12 +191,12 @@ while True:
                     logger.info("Error reading IMU data")
 
                 gyro_x, gyro_y, gyro_z = [float(x) for x in data38.split(',')]
-                accel_x, accel_y, accel_z = [float(x)*9.81 for x in data39.split(',')]
-                mag_x, mag_y, mag_z = [float(x) for x in data40.split(',')]
+                accel_x, accel_y, accel_z = [float(x)*9.81 for x in data39.split(',')] # "G" to m/s^2
+                mag_x, mag_y, mag_z = [float(x)*100 for x in data40.split(',')] # gauss to uT
                 q_x, q_y, q_z, q_w = [float(x) for x in data0.split(',')]
                 conf = float(data45)
 
-                imu_out.write('%s,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n' %(timestamp,accel_x,accel_y,accel_z,mag_x,mag_y,mag_z,gyro_x,gyro_y,gyro_z,q_x,q_y,q_z,q_w,conf))
+                imu_out.write('%s,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n' %(timestamp,accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z,mag_x,mag_y,mag_z,q_x,q_y,q_z,q_w,conf))
 
                 isample = isample + 1
 
@@ -208,7 +211,7 @@ while True:
 
         # Start IMU processing
         logger.info('Start processing')
-        x1 = threading.Thread(target=process_imu_thread, args=(fname, logger,), daemon=True)
+        x1 = threading.Thread(target=process_imu_thread, args=(fname,logger,imuFreq,), daemon=True)
         x1.start()
 
         time.sleep(0.1)
