@@ -9,7 +9,6 @@ from mhkit import wave
 
 
 def read_gps(file):
-    # Yost gets the XYZ coordinate system wrong: +Y and +Z are switched
     df = pd.read_csv(file, header=None, parse_dates=True, infer_datetime_format=True)
     
     ds = xr.Dataset(
