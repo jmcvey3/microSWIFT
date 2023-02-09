@@ -15,7 +15,7 @@ import threading
 from config3 import Config
 import adafruit_fxos8700_microSWIFT
 import adafruit_fxas21002c_microSWIFT
-import processIMU_lib
+
 
 #---------------------------------------------------------------
 configDat = sys.argv[1]
@@ -92,74 +92,6 @@ def init_imu():
 #sensor = adafruit_fxos8700.FXOS8700(i2c, accel_range=adafruit_fxos8700.ACCEL_RANGE_4G)
 #sensor = adafruit_fxos8700.FXOS8700(i2c, accel_range=adafruit_fxos8700.ACCEL_RANGE_8G)
 
-def process_imu_thread(filename):
-    #filename = "../data/raspberrypi_IMU_19Mar2022_042500UTC.dat"
-    with open(filename, 'r') as fp:
-        data = list(csv.reader(fp, delimiter=','))
-    IMUdata = np.array(data)
-
-    axs = IMUdata[:,1] # accelerometer
-    ays = IMUdata[:,2]
-    azs = IMUdata[:,3]
-    gxs = IMUdata[:,4] # gyro
-    gys = IMUdata[:,5]
-    gzs = IMUdata[:,6]
-    mxs = IMUdata[:,7] # magnetometer
-    mys = IMUdata[:,8]
-    mzs = IMUdata[:,9]
-
-    mxo = np.double(60.) # magn calibration data
-    myo = np.double(60.) 
-    mzo = np.double(120.)  
-    Wd = np.double(0.) 
-    fs = np.double(4.) # sampling frequency
-
-    nv=np.size(axs)
-
-    # call processIMU
-    IMU_results = processIMU_lib.main_processIMU(nv, axs, ays, azs, gxs, gys, gzs, 
-                                                    mxs, mys, mzs, mxo, myo, mzo, Wd, fs)
-                                                    
-    Hs = IMU_results[0] # significant wave height
-    Tp = IMU_results[1] # peak wave period
-    Dp = IMU_results[2] # peak wave direction
-    E = np.squeeze(IMU_results[3]) # wave spectra energy
-    f   = np.squeeze(IMU_results[4]) # wave spectra frequency
-    a1 = np.squeeze(IMU_results[5]) # wave spectra a1 moment
-    b1 = np.squeeze(IMU_results[6]) # wave spectra b1 moment
-    a2 = np.squeeze(IMU_results[7]) # wave spectra a2 moment
-    b2 = np.squeeze(IMU_results[8]) # wave spectra b2 moment
-    checkdata = a1*0+1
-
-    ## Write datafile
-    # load config file and get parameters
-    configFilename = sys.argv[1] #Load config file/parameters needed
-    config = Config() # Create object and load file
-    ok = config.loadFile( configFilename )
-    if not ok:
-        logger.info ('Error loading config file: "%s"' % configFilename)
-        sys.exit(1)
-
-    dataDir = config.getString('System', 'dataDir')
-    floatID = os.uname()[1]
-    now=datetime.utcnow()
-    telem_file = dataDir + floatID+'_TXimu_'+"{:%d%b%Y_%H%M%SUTC.dat}".format(now)
-    with open(telem_file, 'w', newline='\n') as fp:
-        fp.write('Hs,Tp,Dp,E,f,a1,b1,a2,b2,checkdata\n')
-        fp.write(str(Hs)+'\n')
-        fp.write(str(Tp)+'\n')
-        fp.write(str(Dp)+'\n')
-        fp.write(','.join(E.astype(str))+'\n')
-        fp.write(','.join(f.astype(str))+'\n')
-        fp.write(','.join(a1.astype(str))+'\n')
-        fp.write(','.join(b1.astype(str))+'\n')
-        fp.write(','.join(a2.astype(str))+'\n')
-        fp.write(','.join(b2.astype(str))+'\n')
-        fp.write(','.join(checkdata.astype(str))+'\n')
-
-    logger.info('data processing complete')
-
-
 # Main loop will read the acceleration and magnetometer values every second
 # and print them out.
 imu = []
@@ -213,10 +145,5 @@ while True:
             #turn imu off     
             #GPIO.output(imu_gpio,GPIO.LOW)
             logger.info('power down IMU')
-
-        # Start IMU processing
-        logger.info('Start processing')
-        x1 = threading.Thread(target=process_imu_thread, args=([fname]), daemon=True)
-        x1.start()
 
     sleep(.50)

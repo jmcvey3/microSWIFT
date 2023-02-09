@@ -322,9 +322,9 @@ def main():
     print('[%.3f] - Time between burst and call: %f' % (elapsed,TimeBetweenBurst_Call))
     eventLog.info('[%.3f] - Time between burst and call: %f' % (elapsed,TimeBetweenBurst_Call))
     
-    if(TimeBetweenBurst_Call < 0):
-        print('[%.3f] - Error callInt larger than burst interval' % elasped)
-        eventLog.error('[%.3f] - Error - callInt larger than burst interval' % elasped)
+    if TimeBetweenBurst_Call < 0:
+        print('[%.3f] - Error callInt larger than burst interval' % elapsed)
+        eventLog.error('[%.3f] - Error - callInt larger than burst interval' % elapsed)
         
     gpsOn = False        #GPS is off
     recordGps = False    #don't start recording

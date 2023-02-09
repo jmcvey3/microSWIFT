@@ -28,7 +28,7 @@ def calc_checksum(message):
 configFilename = sys.argv[1] #Load config file/parameters needed
 config = Config() # Create object and load file
 ok = config.loadFile( configFilename )
-if( not ok ):
+if not ok:
     logger.info ('Error loading config file: "%s"' % configFilename)
     sys.exit(1)
     

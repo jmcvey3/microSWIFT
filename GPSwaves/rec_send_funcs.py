@@ -271,7 +271,7 @@ def setPiTime(timePort):
     while True:
         line = timePort.readline()
         print (line)
-	if "GPRMC" in line:
+        if "GPRMC" in line:
             splitLine = line.split(',')
             UTCTime = splitLine[1]
             date = splitLine[9]
@@ -303,6 +303,3 @@ def setPiTime(timePort):
             subprocess.call('/home/pi/microSWIFT/utils/setTime')
             file.close()
             break
-
-    
-    
