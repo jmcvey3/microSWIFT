@@ -90,11 +90,11 @@ def init_gps():
             logger.info("switching to %s on port %s" % (baud, gps_port))
 
             output_base_commads = ['PUBX,40,GLL,0,0,0,0,0,0',
-                                'PUBX,40,RMC,4,4,0,0,0,0',
-                                'PUBX,40,VTG,1,1,0,0,0,0',
-                                'PUBX,40,GGA,1,1,0,0,0,0',
-                                'PUBX,40,GSA,0,0,0,0,0,0', 
-                                'PUBX,40,GSV,0,0,0,0,0,0']
+                                   'PUBX,40,RMC,4,4,0,0,0,0',
+                                   'PUBX,40,VTG,1,1,0,0,0,0',
+                                   'PUBX,40,GGA,1,1,0,0,0,0',
+                                   'PUBX,40,GSA,0,0,0,0,0,0',
+                                   'PUBX,40,GSV,0,0,0,0,0,0']
             for output_base_command in output_base_commads:
                 output_command = calc_checksum(output_base_command)
                 logger.info('setting NMEA output sentence %s' % (output_command))
@@ -102,12 +102,12 @@ def init_gps():
                 sleep(1)
 
             ## Set sampling frequency
-            sampling_commands = {1: b'\xB5\x62\x06\x08\x06\x00\xE8\x03\x01\x00\x01\x00\x01\x39',
-                                2: b'\xB5\x62\x06\x08\x06\x00\xF4\x01\x01\x00\x01\x00\x0B\x77',
-                                4: b'\xB5\x62\x06\x08\x06\x00\xFA\x00\x01\x00\x01\x00\x10\x96',
-                                5: b'\xB5\x62\x06\x08\x06\x00\xC8\x00\x01\x00\x01\x00\xDE\x6A',
-                                10:b'\xB5\x62\x06\x08\x06\x00\x64\x00\x01\x00\x01\x00\x7A\x12',
-            }
+            sampling_commands = {1: b'\xb5\x62\x06\x08\x06\x00\xe8\x03\x01\x00\x01\x00\x01\x39',
+                                 2: b'\xb5\x62\x06\x08\x06\x00\xf4\x01\x01\x00\x01\x00\x0b\x77',
+                                 4: b'\xb5\x62\x06\x08\x06\x00\xfa\x00\x01\x00\x01\x00\x10\x96',
+                                 5: b'\xb5\x62\x06\x08\x06\x00\xc8\x00\x01\x00\x01\x00\xde\x6a',
+                                 10:b'\xb5\x62\x06\x08\x06\x00\x64\x00\x01\x00\x01\x00\x7a\x12',
+                                 }
             fs_command = sampling_commands[gps_freq]
             logger.info("setting GPS to %s Hz rate: %s" % (gps_freq, fs_command))
             ser.write(fs_command)
@@ -124,11 +124,17 @@ def init_gps():
     try:
         #loop until timeout dictated by gps_timeout value (seconds)
         timeout=t.time() + gps_timeout
+        logger.info("Waiting for GPS lock")
         while t.time() < timeout:
             ser.flush()
             ser.read_until('\n'.encode())
             newline=ser.readline().decode('utf-8')
-            logger.info(newline)
+            
+            if newline=='':
+                pass
+            else:
+                logger.info(newline)
+                
             if not 'GPGGA' in newline:
                 newline=ser.readline().decode('utf-8')
                 if 'GPGGA' in newline:
