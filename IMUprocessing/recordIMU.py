@@ -108,9 +108,9 @@ def process_imu_thread(filename):
     mys = IMUdata[:,8]
     mzs = IMUdata[:,9]
 
-    mxo = np.double(60.) # magn calibration data
-    myo = np.double(60.) 
-    mzo = np.double(120.)  
+    mxo = np.double(-10.) # magn calibration data
+    myo = np.double(-30.) 
+    mzo = np.double(-75.)  
     Wd = np.double(0.) 
     fs = np.double(4.) # sampling frequency
 
