@@ -205,7 +205,7 @@ def record_gps(ser,fname):
     lon.fill(badValue)
     
     try:
-        ser.flush()
+        ser.flushInput()
         with open(fname, 'w',newline='\n') as gps_out:
             
             logger.info('open file for writing: %s' %fname)
@@ -254,7 +254,7 @@ def record_gps(ser,fname):
         logger.info('number of GPVTG samples = %s' %ivel)
         logger.info('number of bad samples %d' %badpts)
                         
-        return u,v,z,lat,lon
+        return u,v,z,lat,lon,ts
         
     except Exception as e:
         logger.info(e, exc_info=True)
