@@ -1,16 +1,24 @@
 import os
-from glob import glob
 import numpy as np
 import pandas as pd
 import xarray as xr
+from glob import glob
+from datetime import datetime
 
 import dolfyn
 from mhkit import wave
 
 
 def read_gps(file):
+    # Read GPS files
     df = pd.read_csv(file, header=None, parse_dates=True, infer_datetime_format=True)
-    
+
+    # Create time array - issue if the day rolls over
+    day = np.datetime64(datetime.strptime(file[-23:-14], '%d%b%Y'), 'D')
+    time = np.empty(np.shape(df[0]), dtype='datetime64[ms]')
+    for i in range(len(df[0])):
+        time[i] = day.astype(str) + ' ' + df[0][i]
+
     ds = xr.Dataset(
         data_vars={'vel': (['dir','time'],
                              np.array([df[1], df[2]]),
@@ -33,17 +41,15 @@ def read_gps(file):
                             'standard_name': 'longitude'}),
                    },
         coords = {'dir': ('dir', ['u','v']),
-                  'time': ('time', df[0].values.astype('datetime64[ns]')),
-                  })
+                  'time': ('time', time)})
     return ds
-
 
 if __name__=='__main__':
     # Buoy deployment config
     fs = 4 # Hz
     nbin = int(fs*600) # 10 minute FFTs
 
-    files = glob(os.path.join('rPi','*_IMU*.dat'))
+    files = glob(os.path.join('rPi','*_GPS*.dat'))
     ds = read_gps(files[0])
     for i in range(len(files)):
         ds = xr.merge((ds, read_gps(files[i])))

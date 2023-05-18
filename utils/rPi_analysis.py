@@ -6,6 +6,7 @@ import xarray as xr
 import scipy.signal as ss
 from scipy.integrate import cumtrapz
 from scipy.spatial.transform import Rotation as R
+from datetime import datetime
 import matplotlib.pyplot as plt
 import matplotlib.dates as mpldt
 plt.rcParams.update({'font.size': 14})
@@ -14,11 +15,18 @@ plt.close('all')
 import dolfyn
 from mhkit import wave
 
+slc_freq = slice(0.0455, 1)
 
 def read_gps(file):
-    # Yost gets the XYZ coordinate system wrong: +Y and +Z are switched
+    # Read GPS files
     df = pd.read_csv(file, header=None, parse_dates=True, infer_datetime_format=True)
-    
+
+    # Create time array - issue if the day rolls over
+    day = np.datetime64(datetime.strptime(file[-23:-14], '%d%b%Y'), 'D')
+    time = np.empty(np.shape(df[0]), dtype='datetime64[ms]')
+    for i in range(len(df[0])):
+        time[i] = day.astype(str) + ' ' + df[0][i]
+
     ds = xr.Dataset(
         data_vars={'vel': (['dir','time'],
                              np.array([df[1], df[2]]),
@@ -41,8 +49,7 @@ def read_gps(file):
                             'standard_name': 'longitude'}),
                    },
         coords = {'dir': ('dir', ['u','v']),
-                  'time': ('time', df[0].values.astype('datetime64[ns]')),
-                  })
+                  'time': ('time', time)})
     return ds
 
 def read_yost_imu(file):
@@ -136,7 +143,7 @@ def butter_lowpass_filter(data, fc, fs, order):
     return y
 
 def filter_accel(ds):
-    filt_freq = 0.0455  # max 20 second waves
+    filt_freq = 0.0455  # max 22 second waves
 
     plt.figure()
     plt.plot(ds.time, ds['accel'][2] - ds['accel'][2].mean())
@@ -144,7 +151,7 @@ def filter_accel(ds):
     plt.xlabel('Time')
 
     # Remove low frequency drift
-    filt_factor = 3 # 5/3 # should be 5/3 for a butterworth filter
+    filt_factor = 5/3 # should be 5/3 for a butterworth filter
     if filt_freq == 0:
         hp = ds['accel'] - ds['accel'].mean()
     else:
@@ -176,12 +183,12 @@ def filter_accel(ds):
 
 
 def process_data(ds_imu, ds_gps, nbin, fs):
-    ds_gps = ds_gps.interp(time=ds_imu.time)
+    ds_imu = ds_imu.interp(time=ds_gps.time)
 
     ## Wave height and period
     fft_tool = dolfyn.adv.api.ADVBinner(nbin, fs, n_fft=nbin/3, n_fft_coh=nbin/3)
     Sww = fft_tool.calc_psd(ds_imu['velacc'][2], freq_units='Hz')
-    Sww = Sww.sel(freq=slice(0.0455, 1))
+    Sww = Sww.sel(freq=slc_freq)
     Szz = Sww / (2*np.pi*Sww['freq'])**2
     pd_Szz = Szz.T.to_pandas()
 
@@ -194,13 +201,13 @@ def process_data(ds_imu, ds_gps, nbin, fs):
                        coords={'dirUVA': ['u','v','accel'],
                                'time': ds_imu.time})
     psd = fft_tool.calc_psd(uva, freq_units='Hz')
-    psd = psd.sel(freq=slice(0.0455, 1))
+    psd = psd.sel(freq=slc_freq)
     Suu = psd.sel(S='Sxx')
     Svv = psd.sel(S='Syy')
     Saa = psd.sel(S='Szz')
 
     csd = fft_tool.calc_csd(uva, freq_units='Hz')
-    csd = csd.sel(coh_freq=slice(0.0455, 1))
+    csd = csd.sel(coh_freq=slc_freq)
     Cua = csd.sel(C='Cxz').real
     Cva = csd.sel(C='Cyz').real
 
@@ -208,6 +215,7 @@ def process_data(ds_imu, ds_gps, nbin, fs):
     b = Cva.values / np.sqrt((Suu+Svv)*Saa).values
     theta = np.arctan(b/a)
     phi = np.sqrt(2*(1 - np.sqrt(a**2 + b**2)))
+    theta = np.nan_to_num(theta) # fill missing data
     phi = np.nan_to_num(phi) # fill missing data
 
     t = dolfyn.time.dt642date(Szz.time)
@@ -274,7 +282,7 @@ if __name__=='__main__':
     # Fetch IMU data
     files = glob(os.path.join('rPi','*_IMU*.dat'))
     ds = read_yost_imu(files[0])
-    for i in range(len(files)):
+    for i in range(len(files)-1): # don't read last file if not complete
         ds = xr.merge((ds, read_yost_imu(files[i])))
     ds.attrs['fs'] = fs
     ds = transform_data(ds)
@@ -282,13 +290,19 @@ if __name__=='__main__':
     ds_imu.to_netcdf('rPi_imu.raw.nc')
 
     # Fetch GPS data
-    files = glob(os.path.join('rPi','*_IMU*.dat'))
+    files = glob(os.path.join('rPi','*_GPS*.dat'))
     ds = read_gps(files[0])
-    for i in range(len(files)):
+    for i in range(len(files)-1): # don't read last file if not complete
         ds = xr.merge((ds, read_gps(files[i])))
     ds.attrs['fs'] = fs
     ds_gps = ds
     ds_gps.to_netcdf('rPi_gps.raw.nc')
 
+    # # Start all instruments on Spotter3 activation
+    # time_slc = slice(np.datetime64('2023-01-27 20:40:40'), None)
+    # ds_imu = ds_imu.sel(time=time_slc)
+    # ds_gps = ds_gps.sel(time=time_slc)
+
     ds_waves = process_data(ds_imu, ds_gps, nbin, fs)
     ds_waves.to_netcdf('rPi.10m.nc')
+    dolfyn.save_mat(ds_waves, 'rPi.10m.mat', datenum=False)
