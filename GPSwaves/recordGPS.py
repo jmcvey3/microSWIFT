@@ -14,7 +14,7 @@ import threading
 
 #my imports
 from config3 import Config
-import process_data
+#import process_data
 
 
 def calc_checksum(message):
@@ -260,7 +260,7 @@ def process_gps_thread(fname,u,v,z,lat,lon,ts):
         for i in range(len(u)):
             fp.write('%s,%f,%f,%f,%f,%f\n' %(ts[i],u[i],v[i],z[i],lat[i],lon[i]))
 
-    process_data.main(u,v,z,lat,lon)
+    #process_data.main(u,v,z,lat,lon)
 
 
 #------------------------------------------------------------------------------------------------------
