@@ -74,7 +74,7 @@ def init_gps():
     #GPIO.output(gpsGPIO,GPIO.HIGH)
     try:
         logger.info('initializing GPS')
-        logger.info("Trying GPS serial port at %s" % baud)
+        logger.info("Trying GPS serial port at %s" % start_baud)
         ser=serial.Serial(gps_port,start_baud,timeout=1)
         logger.info("Connected")
         try:
