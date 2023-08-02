@@ -12,8 +12,9 @@ import matplotlib.dates as mpldt
 plt.rcParams.update({'font.size': 14})
 plt.close('all')
 
-import dolfyn
 from mhkit import wave
+import dolfyn
+
 
 slc_freq = slice(0.0455, 1)
 
@@ -109,7 +110,7 @@ def transform_data(ds):
                               attrs={'units': 'degrees',
                                      'long_name': 'heading',
                                      'standard_name': 'platform_orientation'})
-    plt.figure()
+    plt.figure(figsize=(10,7))
     plt.plot(ds.time, ds['roll'], label='roll')
     plt.plot(ds.time, ds['pitch'], label='pitch')
     plt.legend()
@@ -145,9 +146,9 @@ def butter_lowpass_filter(data, fc, fs, order):
 def filter_accel(ds):
     filt_freq = 0.0455  # max 22 second waves
 
-    plt.figure()
+    plt.figure(figsize=(10,7))
     plt.plot(ds.time, ds['accel'][2] - ds['accel'][2].mean())
-    plt.ylabel('Vertical [m/s]')
+    plt.ylabel('Vertical Acceleration[m/s^2]')
     plt.xlabel('Time')
 
     # Remove low frequency drift
@@ -174,9 +175,9 @@ def filter_accel(ds):
     ds['velacc'].attrs['units'] = 'm/s'
     ds['velacc'].attrs['long name'] = 'velocity vector from accelerometer'
 
-    plt.figure()
+    plt.figure(figsize=(10,7))
     plt.plot(ds['velacc'][2])
-    plt.ylabel('Vertical [m/s]')
+    plt.ylabel('Vertical Velocity [m/s]')
     plt.xlabel('Time')
 
     return ds
@@ -236,20 +237,18 @@ def process_data(ds_imu, ds_gps, nbin, fs):
     plt.ylim((0.00001, 10))
     plt.legend()
 
-    fig, ax = plt.subplots(2, figsize=(15,10))
-    #ax = plt.figure(figsize=(20,10)).add_axes([.14, .14, .8, .74])
+    fig, ax = plt.subplots(2, figsize=(10,7))
     ax[0].scatter(t, Hs)
     ax[0].set_xlabel('Time')
     ax[0].xaxis.set_major_formatter(mpldt.DateFormatter('%D %H:%M:%S'))
     ax[0].set_ylabel('Significant Wave Height [m]')
 
-    #ax = plt.figure(figsize=(20,10)).add_axes([.14, .14, .8, .74])
     ax[1].scatter(t, Te)
     ax[1].set_xlabel('Time')
     ax[1].xaxis.set_major_formatter(mpldt.DateFormatter('%D %H:%M:%S'))
     ax[1].set_ylabel('Energy Period [s]')
 
-    ax = plt.figure(figsize=(20,10)).add_axes([.14, .14, .8, .74])
+    ax = plt.figure(figsize=(10,7)).add_axes([.14, .14, .8, .74])
     ax.scatter(t, direction, label='Wave direction (towards)')
     ax.scatter(t, spread, label='Wave spread')
     ax.set_xlabel('Time')
@@ -287,7 +286,7 @@ if __name__=='__main__':
     ds.attrs['fs'] = fs
     ds = transform_data(ds)
     ds_imu = filter_accel(ds)
-    ds_imu.to_netcdf('rPi_imu.raw.nc')
+    #ds_imu.to_netcdf('data/rPi_imu.raw.nc')
 
     # Fetch GPS data
     files = glob(os.path.join('rPi','*_GPS*.dat'))
@@ -296,13 +295,15 @@ if __name__=='__main__':
         ds = xr.merge((ds, read_gps(files[i])))
     ds.attrs['fs'] = fs
     ds_gps = ds
-    ds_gps.to_netcdf('rPi_gps.raw.nc')
+    #ds_gps.to_netcdf('data/rPi_gps.raw.nc')
 
     # # Start all instruments on Spotter3 activation
-    # time_slc = slice(np.datetime64('2023-01-27 20:40:40'), None)
+    # time_slc = slice(np.datetime64('2023-07-29 00:09:30'),
+    #                  np.datetime64('2023-07-29 01:21:00'))
     # ds_imu = ds_imu.sel(time=time_slc)
     # ds_gps = ds_gps.sel(time=time_slc)
 
     ds_waves = process_data(ds_imu, ds_gps, nbin, fs)
-    ds_waves.to_netcdf('rPi.10m.nc')
-    dolfyn.save_mat(ds_waves, 'rPi.10m.mat', datenum=False)
+
+    #ds_waves.to_netcdf('data/rPi.10m.nc')
+    #dolfyn.save_mat(ds_waves, 'rPi.10m.mat', datenum=False)

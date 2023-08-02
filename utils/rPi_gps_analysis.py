@@ -4,10 +4,15 @@ import pandas as pd
 import xarray as xr
 from glob import glob
 from datetime import datetime
+import matplotlib.pyplot as plt
+import matplotlib.dates as mpldt
+plt.rcParams.update({'font.size': 14})
 
-import dolfyn
 from mhkit import wave
+import dolfyn
 
+
+slc_freq = slice(0.0455, 1)
 
 def read_gps(file):
     # Read GPS files
@@ -44,42 +49,29 @@ def read_gps(file):
                   'time': ('time', time)})
     return ds
 
-if __name__=='__main__':
-    # Buoy deployment config
-    fs = 4 # Hz
-    nbin = int(fs*600) # 10 minute FFTs
-
-    files = glob(os.path.join('rPi','*_GPS*.dat'))
-    ds = read_gps(files[0])
-    for i in range(len(files)):
-        ds = xr.merge((ds, read_gps(files[i])))
-
-    ds.attrs['fs'] = fs
-
+def process_data(ds, nbin, fs):
     ## Using dolfyn to create spectra
     fft_tool = dolfyn.adv.api.ADVBinner(nbin, fs, n_fft=nbin, n_fft_coh=nbin)
-    Sxx = fft_tool.calc_psd(ds['vel'][0], freq_units='Hz')
-    Syy = fft_tool.calc_psd(ds['vel'][1], freq_units='Hz')
+    Sxx = fft_tool.calc_psd(ds['vel'][0], freq_units='Hz').sel(freq=slc_freq)
+    Syy = fft_tool.calc_psd(ds['vel'][1], freq_units='Hz').sel(freq=slc_freq)
     Szz = (Sxx + Syy) / (2*np.pi*Sxx['freq'])**2 # deep water approx
-    Szz = Szz.sel(freq=slice(0.0455, None))
     pd_Szz = Szz.T.to_pandas()
 
     uvz = xr.DataArray(np.array((ds['vel'][0].data, ds['vel'][1].data, ds['z'].data)),
                     dims=['dirUVZ','time'],
                     coords={'dirUVZ': ['u','v','z'],
                             'time': ds.time})
-    csd = fft_tool.calc_csd(uvz, freq_units='Hz')
+    csd = fft_tool.calc_csd(uvz, freq_units='Hz').sel(coh_freq=slc_freq)
     ## Wave direction and spread
     Cxz = csd.sel(C='Cxz').real
     Cyz = csd.sel(C='Cyz').real
-
 
     ## Wave analysis using MHKiT
     Hs = wave.resource.significant_wave_height(pd_Szz)
     Te = wave.resource.energy_period(pd_Szz)
 
-    a = Cxz/np.sqrt((Sxx+Syy)*Szz)
-    b = Cyz/np.sqrt((Sxx+Syy)*Szz)
+    a = Cxz.values/np.sqrt((Sxx+Syy)*Szz)
+    b = Cyz.values/np.sqrt((Sxx+Syy)*Szz)
     theta = np.arctan(b/a) * (180/np.pi) # degrees CCW from East
     #theta = dolfyn.tools.misc.convert_degrees(theta) # degrees CW from North
     phi = np.sqrt(2*(1 - np.sqrt(a**2 + b**2))) * (180/np.pi)
@@ -90,6 +82,37 @@ if __name__=='__main__':
     for i in range(len(Szz.time)):
         direction[i] = np.trapz(theta[i], Szz.freq)
         spread[i] = np.trapz(phi[i], Szz.freq)
+
+    plt.figure()
+    plt.loglog(Szz.freq, pd_Szz.mean(axis=1), label='vertical')
+    m = -4
+    x = np.logspace(-1, 0.5)
+    y = 10**(-5)*x**m
+    plt.loglog(x, y, '--', c='black', label='f^-4')
+    plt.xlabel('Frequency [Hz]')
+    plt.ylabel('Energy Density [m^2/Hz]')
+    plt.ylim((0.00001, 10))
+    plt.legend()
+
+    t = dolfyn.time.dt642date(Szz.time)
+    fig, ax = plt.subplots(2, figsize=(10,7))
+    ax[0].scatter(t, Hs)
+    ax[0].set_xlabel('Time')
+    ax[0].xaxis.set_major_formatter(mpldt.DateFormatter('%D %H:%M:%S'))
+    ax[0].set_ylabel('Significant Wave Height [m]')
+
+    ax[1].scatter(t, Te)
+    ax[1].set_xlabel('Time')
+    ax[1].xaxis.set_major_formatter(mpldt.DateFormatter('%D %H:%M:%S'))
+    ax[1].set_ylabel('Energy Period [s]')
+
+    ax = plt.figure(figsize=(10,7)).add_axes([.14, .14, .8, .74])
+    ax.scatter(t, direction, label='Wave direction (towards)')
+    ax.scatter(t, spread, label='Wave spread')
+    ax.set_xlabel('Time')
+    ax.xaxis.set_major_formatter(mpldt.DateFormatter('%D %H:%M:%S'))
+    ax.set_ylabel('deg')
+    plt.legend()
 
     ds_avg = xr.Dataset()
     ds_avg['Suu'] = Sxx
@@ -105,5 +128,24 @@ if __name__=='__main__':
     ds_avg['direction'] = xr.DataArray(direction, dims=['time'])
     ds_avg['spread'] = xr.DataArray(spread, dims=['time'])
 
-    ds.to_netcdf('rPi_gps.nc')
-    ds_avg.to_netcdf('rPi_gps_spec.nc')
+    return ds_avg
+
+
+if __name__=='__main__':
+    # Buoy deployment config
+    fs = 4 # Hz
+    nbin = int(fs*600) # 10 minute FFTs
+
+    files = glob(os.path.join('NPG_4697186','*_GPS*.dat'))
+    ds = read_gps(files[0])
+    for i in range(len(files)):
+        ds = xr.merge((ds, read_gps(files[i])))
+    ds.attrs['fs'] = fs
+
+    # time_slc = slice(np.datetime64('2023-07-29 00:09:30'),
+    #                  np.datetime64('2023-07-29 01:21:00'))
+    # ds = ds.sel(time=time_slc)
+    ds_avg = process_data(ds, nbin, fs)
+
+    #ds.to_netcdf('rPi_gps.nc')
+    #ds_avg.to_netcdf('rPi_gps_spec.nc')

@@ -6,10 +6,15 @@ import xarray as xr
 import scipy.signal as ss
 from scipy.integrate import cumtrapz
 from scipy.spatial.transform import Rotation as R
+import matplotlib.pyplot as plt
+import matplotlib.dates as mpldt
+plt.rcParams.update({'font.size': 14})
 
-import dolfyn
 from mhkit import wave
+import dolfyn
 
+
+slc_freq = slice(0.0455, 1)
 
 def read_yost_imu(file):
     # Yost gets the XYZ coordinate system wrong: +Y and +Z are switched
@@ -126,37 +131,23 @@ def filter_accel(ds, filt_freq):
     return ds
 
 
-if __name__=='__main__':
-    # Buoy deployment config
-    fs = 4 # Hz
-    nbin = int(fs*600) # 10 minute FFTs
-    filt_freq = 0.0455  # max 22 second waves
-
-    files = glob(os.path.join('data','*_IMU*.dat'))
-    ds = read_yost_imu(files[0])
-    for i in range(len(files)):
-        ds = xr.merge((ds, read_yost_imu(files[i])))
-
-    ds.attrs['fs'] = fs
-    ds = transform_data(ds)
-    ds = filter_accel(ds, filt_freq)
-
+def process_data(ds, nbin, fs):
     ## Using dolfyn to create spectra
     fft_tool = dolfyn.adv.api.ADVBinner(nbin, fs, n_fft=nbin, n_fft_coh=nbin)
     Sww = fft_tool.calc_psd(ds['velacc'][2], freq_units='Hz')
     Szz = Sww / (2*np.pi*Sww['freq'])**2
-    Szz = Szz.sel(freq=slice(0.0455, None))
+    Szz = Szz.sel(freq=slc_freq)
     pd_Szz = Szz.T.to_pandas()
 
     rpa = xr.DataArray(np.array((ds['roll'].data, ds['pitch'].data, ds['accel'][2].data)),
                     dims=['dirRPA','time'],
                     coords={'dirRPA': ['roll','pitch','accel'],
                             'time': ds.time})
-    psd = fft_tool.calc_psd(rpa, freq_units='Hz')
+    psd = fft_tool.calc_psd(rpa, freq_units='Hz').sel(freq=slc_freq)
     Sxx = psd.sel(S='Sxx')
     Syy = psd.sel(S='Syy')
     Saa = psd.sel(S='Szz')
-    csd = fft_tool.calc_csd(rpa, freq_units='Hz')
+    csd = fft_tool.calc_csd(rpa, freq_units='Hz').sel(coh_freq=slc_freq)
 
 
     ## Wave analysis using MHKiT
@@ -164,11 +155,12 @@ if __name__=='__main__':
     Te = wave.resource.energy_period(pd_Szz)
 
     ## Wave direction and spread
+    # Must make sure "coh_freq" == "freq"
     Cxz = csd.sel(C='Cxz').real
     Cyz = csd.sel(C='Cyz').real
 
-    a = Cxz/np.sqrt((Sxx+Syy)*Saa)
-    b = Cyz/np.sqrt((Sxx+Syy)*Saa)
+    a = Cxz.values / np.sqrt((Sxx+Syy)*Saa)
+    b = Cyz.values / np.sqrt((Sxx+Syy)*Saa)
     theta = np.arctan(b/a) * (180/np.pi) # degrees CCW from East
     #theta = dolfyn.tools.misc.convert_degrees(theta) # degrees CW from North
     phi = np.sqrt(2*(1 - np.sqrt(a**2 + b**2))) * (180/np.pi)
@@ -179,6 +171,37 @@ if __name__=='__main__':
     for i in range(len(Szz.time)):
         direction[i] = np.trapz(theta[i], psd.freq)
         spread[i] = np.trapz(phi[i], psd.freq)
+
+    plt.figure()
+    plt.loglog(Szz.freq, pd_Szz.mean(axis=1), label='vertical')
+    m = -4
+    x = np.logspace(-1, 0.5)
+    y = 10**(-5)*x**m
+    plt.loglog(x, y, '--', c='black', label='f^-4')
+    plt.xlabel('Frequency [Hz]')
+    plt.ylabel('Energy Density [m^2/Hz]')
+    plt.ylim((0.00001, 10))
+    plt.legend()
+
+    t = dolfyn.time.dt642date(Szz.time)
+    fig, ax = plt.subplots(2, figsize=(10,7))
+    ax[0].scatter(t, Hs)
+    ax[0].set_xlabel('Time')
+    ax[0].xaxis.set_major_formatter(mpldt.DateFormatter('%D %H:%M:%S'))
+    ax[0].set_ylabel('Significant Wave Height [m]')
+
+    ax[1].scatter(t, Te)
+    ax[1].set_xlabel('Time')
+    ax[1].xaxis.set_major_formatter(mpldt.DateFormatter('%D %H:%M:%S'))
+    ax[1].set_ylabel('Energy Period [s]')
+
+    ax = plt.figure(figsize=(10,7)).add_axes([.14, .14, .8, .74])
+    ax.scatter(t, direction, label='Wave direction (towards)')
+    ax.scatter(t, spread, label='Wave spread')
+    ax.set_xlabel('Time')
+    ax.xaxis.set_major_formatter(mpldt.DateFormatter('%D %H:%M:%S'))
+    ax.set_ylabel('deg')
+    plt.legend()
 
     ds_avg = xr.Dataset()
     ds_avg['Szz'] = Szz
@@ -195,5 +218,28 @@ if __name__=='__main__':
     ds_avg['direction'] = xr.DataArray(direction, dims=['time'])
     ds_avg['spread'] = xr.DataArray(spread, dims=['time'])
 
-    ds.to_netcdf('data/rPi_imu.nc')
-    ds_avg.to_netcdf('data/rPi_imu_spec.nc')
+    return ds_avg
+
+
+if __name__=='__main__':
+    # Buoy deployment config
+    fs = 4 # Hz
+    nbin = int(fs*600) # 10 minute FFTs
+    filt_freq = 0.0455  # max 22 second waves
+
+    files = glob(os.path.join('rPi','*_IMU*.dat'))
+    ds = read_yost_imu(files[0])
+    for i in range(len(files)-1): # don't read last file if not complete
+        ds = xr.merge((ds, read_yost_imu(files[i])))
+
+    ds.attrs['fs'] = fs
+    ds = transform_data(ds)
+    ds_imu = filter_accel(ds, filt_freq)
+
+    # time_slc = slice(np.datetime64('2023-07-29 00:09:30'),
+    #                  np.datetime64('2023-07-29 01:21:00'))
+    # ds = ds.sel(time=time_slc)
+    ds_avg = process_data(ds, nbin, fs)
+
+    #ds.to_netcdf('rPi_imu.nc')
+    #ds_avg.to_netcdf('rPi_imu_spec.nc')
