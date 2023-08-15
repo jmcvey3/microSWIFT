@@ -77,6 +77,13 @@ def transform_data(ds):
     return ds
 
 
+def calc_tilt(pitch, roll):
+    tilt = np.rad2deg(np.arctan(
+        np.sqrt(np.tan(np.deg2rad(roll)) ** 2 + np.tan(np.deg2rad(pitch)) ** 2)
+    ))
+    return tilt
+
+
 def RCfilter(b, fc=0.05, fs=2):
     """
     authors: @EJRainville, @AlexdeKlerk, @Viviana Castillo
@@ -182,6 +189,7 @@ def process_data(ds, nbin, fs):
     plt.ylabel('Energy Density [m^2/Hz]')
     plt.ylim((0.00001, 10))
     plt.legend()
+    plt.savefig('fig/wave_spectrum.imu.png')
 
     t = dolfyn.time.dt642date(Szz.time)
     fig, ax = plt.subplots(2, figsize=(10,7))
@@ -194,6 +202,7 @@ def process_data(ds, nbin, fs):
     ax[1].set_xlabel('Time')
     ax[1].xaxis.set_major_formatter(mpldt.DateFormatter('%D %H:%M:%S'))
     ax[1].set_ylabel('Energy Period [s]')
+    plt.savefig('fig/wave_stats.imu.png')
 
     ax = plt.figure(figsize=(10,7)).add_axes([.14, .14, .8, .74])
     ax.scatter(t, direction, label='Wave direction (towards)')
@@ -202,6 +211,7 @@ def process_data(ds, nbin, fs):
     ax.xaxis.set_major_formatter(mpldt.DateFormatter('%D %H:%M:%S'))
     ax.set_ylabel('deg')
     plt.legend()
+    plt.savefig('fig/wave_direction.imu.png')
 
     ds_avg = xr.Dataset()
     ds_avg['Szz'] = Szz
@@ -217,6 +227,24 @@ def process_data(ds, nbin, fs):
     ds_avg['b1'] = b
     ds_avg['direction'] = xr.DataArray(direction, dims=['time'])
     ds_avg['spread'] = xr.DataArray(spread, dims=['time'])
+
+    plt.figure(figsize=(10,7))
+    plt.plot(ds_imu.time, ds_imu['roll'], label='roll')
+    plt.plot(ds_imu.time, ds_imu['pitch'], label='pitch')
+    plt.ylim((-35, 35))
+    plt.legend()
+    plt.savefig('fig/pitch_roll.imu.png')
+
+    tilt = calc_tilt(ds_imu['roll']-ds_imu['roll'].mean(),
+                     ds_imu['pitch']-ds_imu['pitch'].mean(),)
+    tilt_med = tilt.rolling(time=30, center=True).median()
+
+    plt.figure(figsize=(10,7))
+    plt.plot(ds_imu.time, tilt, label='tilt')
+    plt.plot(ds_imu.time, tilt_med, label='median filter')
+    plt.ylim((0, 35))
+    plt.legend()
+    plt.savefig('fig/tilt.imu.png')
 
     return ds_avg
 

@@ -49,6 +49,7 @@ def read_gps(file):
                   'time': ('time', time)})
     return ds
 
+
 def process_data(ds, nbin, fs):
     ## Using dolfyn to create spectra
     fft_tool = dolfyn.adv.api.ADVBinner(nbin, fs, n_fft=nbin, n_fft_coh=nbin)
@@ -93,6 +94,7 @@ def process_data(ds, nbin, fs):
     plt.ylabel('Energy Density [m^2/Hz]')
     plt.ylim((0.00001, 10))
     plt.legend()
+    plt.savefig('fig/wave_spectrum.gps.png')
 
     t = dolfyn.time.dt642date(Szz.time)
     fig, ax = plt.subplots(2, figsize=(10,7))
@@ -105,6 +107,7 @@ def process_data(ds, nbin, fs):
     ax[1].set_xlabel('Time')
     ax[1].xaxis.set_major_formatter(mpldt.DateFormatter('%D %H:%M:%S'))
     ax[1].set_ylabel('Energy Period [s]')
+    fig.savefig('fig/wave_stats.gps.png')
 
     ax = plt.figure(figsize=(10,7)).add_axes([.14, .14, .8, .74])
     ax.scatter(t, direction, label='Wave direction (towards)')
@@ -113,6 +116,7 @@ def process_data(ds, nbin, fs):
     ax.xaxis.set_major_formatter(mpldt.DateFormatter('%D %H:%M:%S'))
     ax.set_ylabel('deg')
     plt.legend()
+    plt.savefig('fig/wave_direction.gps.png')
 
     ds_avg = xr.Dataset()
     ds_avg['Suu'] = Sxx
@@ -127,6 +131,12 @@ def process_data(ds, nbin, fs):
     ds_avg['b1'] = b
     ds_avg['direction'] = xr.DataArray(direction, dims=['time'])
     ds_avg['spread'] = xr.DataArray(spread, dims=['time'])
+
+    fig, ax = plt.subplots(figsize=(10,7))
+    ax.scatter(ds["lon"], ds["lat"])
+    ax.set(ylabel="Latitude [deg N]", xlabel="Longitude [deg E]")
+    ax.ticklabel_format(axis='both', style='plain', useOffset=False)
+    fig.savefig('fig/location.gps.png')
 
     return ds_avg
 

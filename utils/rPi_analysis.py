@@ -110,12 +110,16 @@ def transform_data(ds):
                               attrs={'units': 'degrees',
                                      'long_name': 'heading',
                                      'standard_name': 'platform_orientation'})
-    plt.figure(figsize=(10,7))
-    plt.plot(ds.time, ds['roll'], label='roll')
-    plt.plot(ds.time, ds['pitch'], label='pitch')
-    plt.legend()
 
     return ds
+
+
+def calc_tilt(pitch, roll):
+    tilt = np.rad2deg(np.arctan(
+        np.sqrt(np.tan(np.deg2rad(roll)) ** 2 + np.tan(np.deg2rad(pitch)) ** 2)
+    ))
+    return tilt
+
 
 def RCfilter(b, fc=0.05, fs=2):
     """
@@ -136,12 +140,14 @@ def RCfilter(b, fc=0.05, fs=2):
         a[ui] = alpha * a[ui-1] + alpha * ( b[ui] - b[ui-1] )
     return a
 
+
 def butter_lowpass_filter(data, fc, fs, order):
     normal_cutoff = fc / (0.5 * fs)
     # Get the filter coefficients 
     b, a = ss.butter(order, normal_cutoff, btype='low', analog=False)
     y = ss.filtfilt(b, a, data)
     return y
+
 
 def filter_accel(ds):
     filt_freq = 0.0455  # max 22 second waves
@@ -236,6 +242,7 @@ def process_data(ds_imu, ds_gps, nbin, fs):
     plt.ylabel('Energy Density [m^2/Hz]')
     plt.ylim((0.00001, 10))
     plt.legend()
+    plt.savefig('fig/wave_spectrum.png')
 
     fig, ax = plt.subplots(2, figsize=(10,7))
     ax[0].scatter(t, Hs)
@@ -247,6 +254,7 @@ def process_data(ds_imu, ds_gps, nbin, fs):
     ax[1].set_xlabel('Time')
     ax[1].xaxis.set_major_formatter(mpldt.DateFormatter('%D %H:%M:%S'))
     ax[1].set_ylabel('Energy Period [s]')
+    plt.savefig('fig/wave_stats.png')
 
     ax = plt.figure(figsize=(10,7)).add_axes([.14, .14, .8, .74])
     ax.scatter(t, direction, label='Wave direction (towards)')
@@ -255,6 +263,7 @@ def process_data(ds_imu, ds_gps, nbin, fs):
     ax.xaxis.set_major_formatter(mpldt.DateFormatter('%D %H:%M:%S'))
     ax.set_ylabel('deg')
     plt.legend()
+    plt.savefig('fig/wave_direction.png')
 
     ds_avg = xr.Dataset()
     ds_avg['Szz'] = Szz
@@ -269,6 +278,31 @@ def process_data(ds_imu, ds_gps, nbin, fs):
     ds_avg['b1'] = xr.DataArray(b, dims=['time', 'freq'])
     ds_avg['direction'] = xr.DataArray(direction, dims=['time'])
     ds_avg['spread'] = xr.DataArray(spread, dims=['time'])
+
+
+    plt.figure(figsize=(10,7))
+    plt.plot(ds_imu.time, ds_imu['roll'], label='roll')
+    plt.plot(ds_imu.time, ds_imu['pitch'], label='pitch')
+    plt.ylim((-35, 35))
+    plt.legend()
+    plt.savefig('fig/pitch_roll.png')
+
+    tilt = calc_tilt(ds_imu['roll']-ds_imu['roll'].mean(),
+                     ds_imu['pitch']-ds_imu['pitch'].mean(),)
+    tilt_med = tilt.rolling(time=30, center=True).median()
+
+    plt.figure(figsize=(10,7))
+    plt.plot(ds_imu.time, tilt, label='tilt')
+    plt.plot(ds_imu.time, tilt_med, label='median filter')
+    plt.ylim((0, 35))
+    plt.legend()
+    plt.savefig('fig/tilt.png')
+
+    fig, ax = plt.subplots(figsize=(10,7))
+    ax.scatter(ds_gps["lon"], ds_gps["lat"])
+    ax.set(ylabel="Latitude [deg N]", xlabel="Longitude [deg E]")
+    ax.ticklabel_format(axis='both', style='plain', useOffset=False)
+    fig.savefig('fig/gps.png')
 
     return ds_avg
 
