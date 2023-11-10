@@ -114,7 +114,9 @@ def butter_lowpass_filter(data, fc, fs, order):
 
 def filter_accel(ds, filt_freq):
     # Remove low frequency drift
-    filt_factor = 3 # should be 5/3 for a butterworth filter??
+    # Filter factor should be 5/3 for a perfectly centered or gimballed IMU
+    # Tune filt_factor to buoy if IMU is not centered (Teng 2002)
+    filt_factor = 5/3
     if filt_freq == 0:
         hp = ds['accel'] - ds['accel'].mean()
     else:
@@ -146,6 +148,7 @@ def process_data(ds, nbin, fs):
     Szz = Szz.sel(freq=slc_freq)
     pd_Szz = Szz.T.to_pandas()
     
+    # Non-deterministic approach:
     # Saa = fft_tool.calc_psd(ds['accel'][2], freq_units='Hz')
     # Szz = Saa / (2*np.pi*Saa['freq'])**4
     # Szz = Szz.sel(freq=slc_freq)

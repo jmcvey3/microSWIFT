@@ -158,7 +158,9 @@ def filter_accel(ds):
     plt.xlabel('Time')
 
     # Remove low frequency drift
-    filt_factor = 5/3 # should be 5/3 for a butterworth filter
+    # Filter factor should be 5/3 for a perfectly centered or gimballed IMU
+    # Tune filt_factor to buoy if IMU is not centered (Teng 2002)
+    filt_factor = 5/3
     if filt_freq == 0:
         hp = ds['accel'] - ds['accel'].mean()
     else:
@@ -199,7 +201,7 @@ def process_data(ds_imu, ds_gps, nbin, fs):
     Szz = Sww / (2*np.pi*Sww['freq'])**2
     pd_Szz = Szz.T.to_pandas()
     
-    # If directional estimates are not needed:
+    # Non-deterministic approach:
     # Saa = fft_tool.calc_psd(ds_imu['accel'][2], freq_units='Hz')
     # Szz_2 = Saa / (2*np.pi*Sww['freq'])**4
     # plt.figure()
