@@ -69,20 +69,24 @@ def process_data(ds, nbin, fs):
 
     ## Wave analysis using MHKiT
     Hs = wave.resource.significant_wave_height(pd_Szz)
+    Tm = wave.resource.average_wave_period(pd_Szz)
     Te = wave.resource.energy_period(pd_Szz)
+    Tp = wave.resource.peak_period(pd_Szz)
 
     a = Cxz.values/np.sqrt((Sxx+Syy)*Szz)
     b = Cyz.values/np.sqrt((Sxx+Syy)*Szz)
-    theta = np.arctan(b/a) * (180/np.pi) # degrees CCW from East
-    #theta = dolfyn.tools.misc.convert_degrees(theta) # degrees CW from North
-    phi = np.sqrt(2*(1 - np.sqrt(a**2 + b**2))) * (180/np.pi)
-    phi = phi.fillna(0) # fill missing data
+    theta = np.arctan(b/a) # degrees CCW from East, "to" convention
+    phi = np.sqrt(2*(1 - np.sqrt(a**2 + b**2)))
+    phi = np.nan_to_num(phi) # fill missing data
 
     direction = np.arange(len(Szz.time))
     spread = np.arange(len(Szz.time))
     for i in range(len(Szz.time)):
-        direction[i] = np.trapz(theta[i], Szz.freq)
-        spread[i] = np.trapz(phi[i], Szz.freq)
+        # degrees CW from North, "to" convention (90 - X)
+        # degrees CW from North, "from" convention (-90 - X)
+        direction[i] = -90 - np.rad2deg(np.trapz(theta[i], Szz.freq))
+        spread[i] = np.rad2deg(np.trapz(phi[i], Szz.freq))
+
 
     plt.figure()
     plt.loglog(Szz.freq, pd_Szz.mean(axis=1), label='vertical')
@@ -124,7 +128,9 @@ def process_data(ds, nbin, fs):
     ds_avg['Szz'] = Szz
     ds['uvz'] = uvz
     ds_avg['Hs'] = Hs.to_xarray()['Hm0']
+    ds_avg['Tm'] = Tm.to_xarray()['Tm']
     ds_avg['Te'] = Te.to_xarray()['Te']
+    ds_avg['Tp'] = Tp.to_xarray()['Tp']
     ds_avg['Cuz'] = Cxz
     ds_avg['Cvz'] = Cyz
     ds_avg['a1'] = a

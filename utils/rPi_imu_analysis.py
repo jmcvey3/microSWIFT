@@ -114,7 +114,7 @@ def butter_lowpass_filter(data, fc, fs, order):
 
 def filter_accel(ds, filt_freq):
     # Remove low frequency drift
-    filt_factor = 5/3 # should be 5/3 for a butterworth filter
+    filt_factor = 3 # should be 5/3 for a butterworth filter??
     if filt_freq == 0:
         hp = ds['accel'] - ds['accel'].mean()
     else:
@@ -145,6 +145,11 @@ def process_data(ds, nbin, fs):
     Szz = Sww / (2*np.pi*Sww['freq'])**2
     Szz = Szz.sel(freq=slc_freq)
     pd_Szz = Szz.T.to_pandas()
+    
+    # Saa = fft_tool.calc_psd(ds['accel'][2], freq_units='Hz')
+    # Szz = Saa / (2*np.pi*Saa['freq'])**4
+    # Szz = Szz.sel(freq=slc_freq)
+    # pd_Szz = Szz.T.to_pandas()
 
     rpa = xr.DataArray(np.array((ds['roll'].data, ds['pitch'].data, ds['accel'][2].data)),
                     dims=['dirRPA','time'],
@@ -159,7 +164,9 @@ def process_data(ds, nbin, fs):
 
     ## Wave analysis using MHKiT
     Hs = wave.resource.significant_wave_height(pd_Szz)
+    Tm = wave.resource.average_wave_period(pd_Szz)
     Te = wave.resource.energy_period(pd_Szz)
+    Tp = wave.resource.peak_period(pd_Szz)
 
     ## Wave direction and spread
     # Must make sure "coh_freq" == "freq"
@@ -168,16 +175,18 @@ def process_data(ds, nbin, fs):
 
     a = Cxz.values / np.sqrt((Sxx+Syy)*Saa)
     b = Cyz.values / np.sqrt((Sxx+Syy)*Saa)
-    theta = np.arctan(b/a) * (180/np.pi) # degrees CCW from East
-    #theta = dolfyn.tools.misc.convert_degrees(theta) # degrees CW from North
-    phi = np.sqrt(2*(1 - np.sqrt(a**2 + b**2))) * (180/np.pi)
-    phi = phi.fillna(0) # fill missing data
+    theta = np.arctan(b/a) # degrees CCW from East, "to" convention
+    phi = np.sqrt(2*(1 - np.sqrt(a**2 + b**2)))
+    phi = np.nan_to_num(phi) # fill missing data
 
     direction = np.arange(len(Szz.time))
     spread = np.arange(len(Szz.time))
     for i in range(len(Szz.time)):
-        direction[i] = np.trapz(theta[i], psd.freq)
-        spread[i] = np.trapz(phi[i], psd.freq)
+        # degrees CW from North, "to" convention (90 - X)
+        # degrees CW from North, "from" convention (-90 - X)
+        direction[i] = -90 - np.rad2deg(np.trapz(theta[i], psd.freq))
+        spread[i] = np.rad2deg(np.trapz(phi[i], psd.freq))
+
 
     plt.figure()
     plt.loglog(Szz.freq, pd_Szz.mean(axis=1), label='vertical')
@@ -220,7 +229,9 @@ def process_data(ds, nbin, fs):
     ds_avg['Spp'] = Syy
     ds_avg['Saa'] = Saa
     ds_avg['Hs'] = Hs.to_xarray()['Hm0']
+    ds_avg['Tm'] = Tm.to_xarray()['Tm']
     ds_avg['Te'] = Te.to_xarray()['Te']
+    ds_avg['Tp'] = Tp.to_xarray()['Tp']
     ds_avg['Cra'] = Cxz
     ds_avg['Cpa'] = Cyz
     ds_avg['a1'] = a
@@ -229,19 +240,19 @@ def process_data(ds, nbin, fs):
     ds_avg['spread'] = xr.DataArray(spread, dims=['time'])
 
     plt.figure(figsize=(10,7))
-    plt.plot(ds_imu.time, ds_imu['roll'], label='roll')
-    plt.plot(ds_imu.time, ds_imu['pitch'], label='pitch')
+    plt.plot(ds.time, ds['roll'], label='roll')
+    plt.plot(ds.time, ds['pitch'], label='pitch')
     plt.ylim((-35, 35))
     plt.legend()
     plt.savefig('fig/pitch_roll.imu.png')
 
-    tilt = calc_tilt(ds_imu['roll']-ds_imu['roll'].mean(),
-                     ds_imu['pitch']-ds_imu['pitch'].mean(),)
+    tilt = calc_tilt(ds['roll']-ds['roll'].mean(),
+                     ds['pitch']-ds['pitch'].mean(),)
     tilt_med = tilt.rolling(time=30, center=True).median()
 
     plt.figure(figsize=(10,7))
-    plt.plot(ds_imu.time, tilt, label='tilt')
-    plt.plot(ds_imu.time, tilt_med, label='median filter')
+    plt.plot(ds.time, tilt, label='tilt')
+    plt.plot(ds.time, tilt_med, label='median filter')
     plt.ylim((0, 35))
     plt.legend()
     plt.savefig('fig/tilt.imu.png')
@@ -262,7 +273,7 @@ if __name__=='__main__':
 
     ds.attrs['fs'] = fs
     ds = transform_data(ds)
-    ds_imu = filter_accel(ds, filt_freq)
+    ds = filter_accel(ds, filt_freq)
 
     # time_slc = slice(np.datetime64('2023-07-29 00:09:30'),
     #                  np.datetime64('2023-07-29 01:21:00'))

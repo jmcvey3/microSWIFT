@@ -190,7 +190,7 @@ def filter_accel(ds):
 
 
 def process_data(ds_imu, ds_gps, nbin, fs):
-    ds_imu = ds_imu.interp(time=ds_gps.time)
+    ds_imu = ds_imu.interp(time=ds_gps.time, kwargs={"fill_value": "extrapolate"})
 
     ## Wave height and period
     fft_tool = dolfyn.adv.api.ADVBinner(nbin, fs, n_fft=nbin/3, n_fft_coh=nbin/3)
@@ -198,9 +198,18 @@ def process_data(ds_imu, ds_gps, nbin, fs):
     Sww = Sww.sel(freq=slc_freq)
     Szz = Sww / (2*np.pi*Sww['freq'])**2
     pd_Szz = Szz.T.to_pandas()
+    
+    # If directional estimates are not needed:
+    # Saa = fft_tool.calc_psd(ds_imu['accel'][2], freq_units='Hz')
+    # Szz_2 = Saa / (2*np.pi*Sww['freq'])**4
+    # plt.figure()
+    # plt.loglog(Szz.mean('time'))
+    # plt.loglog(Szz_2.mean('time'))
 
     Hs = wave.resource.significant_wave_height(pd_Szz)
+    Tm = wave.resource.average_wave_period(pd_Szz)
     Te = wave.resource.energy_period(pd_Szz)
+    Tp = wave.resource.peak_period(pd_Szz)
 
     ## Wave direction and spread
     uva = xr.DataArray(np.array((ds_gps['vel'][0].data, ds_gps['vel'][1].data, ds_imu['accel'][2].data)),
@@ -220,18 +229,20 @@ def process_data(ds_imu, ds_gps, nbin, fs):
 
     a = Cua.values / np.sqrt((Suu+Svv)*Saa).values
     b = Cva.values / np.sqrt((Suu+Svv)*Saa).values
-    theta = np.arctan(b/a)
+    theta = np.arctan(b/a) # degrees CCW from East, "to" convention
     phi = np.sqrt(2*(1 - np.sqrt(a**2 + b**2)))
     theta = np.nan_to_num(theta) # fill missing data
     phi = np.nan_to_num(phi) # fill missing data
 
-    t = dolfyn.time.dt642date(Szz.time)
-    direction = np.arange(len(t))
-    spread = np.arange(len(t))
-    for i in range(len(t)):
-        direction[i] = 90 - np.rad2deg(np.trapz(theta[i], psd.freq)) # degrees CW from North
+    direction = np.arange(len(Szz.time))
+    spread = np.arange(len(Szz.time))
+    for i in range(len(Szz.time)):
+        # degrees CW from North, "to" convention (90 - X)
+        # degrees CW from North, "from" convention (-90 - X)
+        direction[i] = -90 - np.rad2deg(np.trapz(theta[i], psd.freq))
         spread[i] = np.rad2deg(np.trapz(phi[i], psd.freq))
 
+    
     plt.figure()
     plt.loglog(Szz.freq, pd_Szz.mean(axis=1), label='vertical')
     m = -4
@@ -244,6 +255,7 @@ def process_data(ds_imu, ds_gps, nbin, fs):
     plt.legend()
     plt.savefig('fig/wave_spectrum.png')
 
+    t = dolfyn.time.dt642date(Szz.time)
     fig, ax = plt.subplots(2, figsize=(10,7))
     ax[0].scatter(t, Hs)
     ax[0].set_xlabel('Time')
@@ -271,7 +283,9 @@ def process_data(ds_imu, ds_gps, nbin, fs):
     ds_avg['Svv'] = Svv
     ds_avg['Saa'] = Saa
     ds_avg['Hs'] = Hs.to_xarray()['Hm0']
+    ds_avg['Tm'] = Tm.to_xarray()['Tm']
     ds_avg['Te'] = Te.to_xarray()['Te']
+    ds_avg['Tp'] = Tp.to_xarray()['Tp']
     ds_avg['Cua'] = Cua
     ds_avg['Cva'] = Cva
     ds_avg['a1'] = xr.DataArray(a, dims=['time', 'freq'])
