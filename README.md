@@ -6,13 +6,18 @@ https://apl.washington.edu/SWIFT
 
 
 To run:
-  1. Enable UART on rPi instead of USB: cdn-learn.adafruit.com/downloads/pdf/adafruit-ultimate-gps-on-the-raspberry-pi.pdf
-  1. `sudo pip install pynmea2`
-  2. Add the following text to rc.local to run on boot (`sudo nano /etc/rc.local`)
+  1. Enable UART on rPi instead of USB: page 9 of cdn-learn.adafruit.com/downloads/pdf/adafruit-ultimate-gps-on-the-raspberry-pi.pdf
+  2. `sudo pip install pynmea2`
+  3. "cd" to the microSWIFT folder and switch branches:
+```bash 
+    cd /home/pi/microSWIFT
+    git checkout witt_interference
+```
+  4. Add the following text to rc.local to run on boot (`sudo nano /etc/rc.local`)
 ```bash 
     # Run microswift
     cd /home/pi/microSWIFT
     bash run_microswift.sh &
 ```
-  3. reboot the rPi
-  4. Add scripts to the main .sh file as necessary
+  5. reboot the rPi
+  6. Add scripts to the main .sh file as necessary
