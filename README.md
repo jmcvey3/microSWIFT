@@ -13,11 +13,16 @@ To run:
     cd /home/pi/microSWIFT
     git checkout witt_interference
 ```
-  4. Add the following text to rc.local to run on boot (`sudo nano /etc/rc.local`)
+  4. Create empty "data" and "logs" folders in the microSWIFT directory:
+```bash 
+    mkdir /home/pi/microSWIFT/data
+    mkdir /home/pi/microSWIFT/logs
+```
+  5. Add the following text to rc.local to run on boot (`sudo nano /etc/rc.local`)
 ```bash 
     # Run microswift
     cd /home/pi/microSWIFT
     bash run_microswift.sh &
 ```
-  5. reboot the rPi
-  6. Add scripts to the main .sh file as necessary
+  6. reboot the rPi
+  7. Add scripts to the main .sh file as necessary
