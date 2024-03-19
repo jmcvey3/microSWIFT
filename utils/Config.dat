@@ -98,7 +98,7 @@ baud=115200
 #gpsGPIO=15
 #GPS reporting rate
 gps_frequency=4
-timeout=360
+timeout=3600
 #========================== IMU Parameters ========================
 [IMU]
 port=/dev/ttyACM0
