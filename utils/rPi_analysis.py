@@ -109,7 +109,10 @@ def read_yost_imu(file):
 
 
 def transform_data(ds):
-    # Rotate the acclerations from the computed quaterions into Earth coordinates
+    # Rotate accelerometer into Earth coordinates
+    r = R.from_quat(ds["quaternions"].T)
+    ds["accel"].values = r.apply(ds["accel"].T.values).T
+
     r = R.from_quat(ds["quaternions"].T)
     rpy = r.as_euler("XYZ", degrees=True)
     ds["roll"] = xr.DataArray(
@@ -155,66 +158,86 @@ def calc_tilt(pitch, roll):
     return tilt
 
 
-def RCfilter(b, fc=0.05, fs=2):
-    """
-    authors: @EJRainville, @AlexdeKlerk, @Viviana Castillo
-    #TODO: fix docstr
-    Helper function to perform RC filtering
-    Input:
-        - b, array of values to be filtered
-        - fc, cutoff frequency, fc = 1/(2πRC)
-        - fs, sampling frequency
-    Output:
-        - a, array of filtered input values
-    """
-    RC = (2 * np.pi * fc) ** (-1)
-    alpha = RC / (RC + 1.0 / fs)
-    a = b.copy()
-    for ui in np.arange(1, len(b)):  # speed this up
-        a[ui] = alpha * a[ui - 1] + alpha * (b[ui] - b[ui - 1])
-    return a
+def calc_vel_rotation(angrt, vec=[0, 0, -0.25]):
+    # Calculate the induced velocity due to rotations of a point about the IMU center.
+
+    # Motion of the IMU about the Witt's origin should be the
+    # cross-product of omega (rotation rate vector) and the vector.
+    #   u=dz*omegaY-dy*omegaZ,v=dx*omegaZ-dz*omegaX,w=dy*omegaX-dx*omegaY
+    # where vec=[dx,dy,dz], and angrt=[omegaX,omegaY,omegaZ]
+    velrot = np.array(
+        [
+            (vec[2] * angrt[1] - vec[1] * angrt[2]),
+            (vec[0] * angrt[2] - vec[2] * angrt[0]),
+            (vec[1] * angrt[0] - vec[0] * angrt[1]),
+        ]
+    )
+    # Rotate induced velocity to earth coordinates
+    r = R.from_quat(ds["quaternions"].T)
+    velrot = r.apply(velrot.T).T
+
+    return velrot
 
 
-def butter_lowpass_filter(data, fc, fs, order):
-    normal_cutoff = fc / (0.5 * fs)
+def butter_bandpass_filter(data, fc, fh, fs, order):
+    normal_cutoff = [fc / (0.5 * fs), fh / (0.5 * fs)]
     # Get the filter coefficients
-    b, a = ss.butter(order, normal_cutoff, btype="low", analog=False)
+    b, a = ss.butter(order, normal_cutoff, btype="bandpass", analog=False)
     y = ss.filtfilt(b, a, data)
     return y
 
 
 def filter_accel(ds):
-    filt_freq = 0.0455  # max 22 second waves
+    filt_freq_low = 0.0455  # max 22 second waves
+    filt_freq_high = 0.5
+    filt_factor = 5 / 3  # should be 5/3 for butterworth filter
 
-    # Remove low frequency drift
-    acclow = ds["accel"].copy()
-    acclow = butter_lowpass_filter(acclow, 5 / 3 * filt_freq, ds.fs, 2)
-    hp = ds["accel"].values - acclow
-
-    ds["accel"].values = hp
+    # Run band pass filter
+    accel = ds["accel"].copy()
+    accel = butter_bandpass_filter(
+        accel,
+        filt_factor * filt_freq_low,
+        filt_factor * filt_freq_high,
+        ds.fs,
+        1,
+    )
 
     # Integrate
-    veldat = np.concatenate(
-        (np.zeros(list(hp.shape[:-1]) + [1]), cumtrapz(hp, dx=1 / ds.fs, axis=-1)),
+    hp = np.concatenate(
+        (
+            np.zeros(list(accel.shape[:-1]) + [1]),
+            cumtrapz(accel, dx=1 / ds.fs, axis=-1),
+        ),
         axis=-1,
     )
-    # Run RC differentiator (high pass)
-    veldat = RCfilter(veldat, filt_freq, ds.fs)
-    # veldat -= np.nanmean(veldat)
-    vellow = veldat.copy()
-    vellow = butter_lowpass_filter(vellow, 5 / 3 * filt_freq, ds.fs, 2)
-    veldat -= vellow
+    # Run bandpass filter
+    veldat = butter_bandpass_filter(
+        hp,
+        filt_factor * filt_freq_low,
+        filt_factor * filt_freq_high,
+        ds.fs,
+        1,
+    )
+
+    # Subtract moment arm from rotating buoy
+    vel_rot = calc_vel_rotation(ds["angrt"].values)
+    veldat -= vel_rot  # Subtract motion in Z from accelerometer motion
 
     # Integrate and filter again
-    posdat = np.concatenate(
+    hp = np.concatenate(
         (
             np.zeros(list(veldat.shape[:-1]) + [1]),
             cumtrapz(veldat, dx=1 / ds.fs, axis=-1),
         ),
         axis=-1,
     )
-    posdat = RCfilter(posdat, filt_freq, ds.fs)
-    posdat -= np.nanmean(posdat)
+    posdat = butter_bandpass_filter(
+        hp,
+        filt_factor * filt_freq_low,
+        filt_factor * filt_freq_high,
+        ds.fs,
+        1,
+    )
 
     ds["velacc"] = ds["accel"].copy() * 0
     ds["velacc"].values = veldat
