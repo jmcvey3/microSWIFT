@@ -308,22 +308,17 @@ def process_data(ds_imu, ds_gps, nbin, fs):
     Cua = csd.sel(C="Cxz").real
     Cva = csd.sel(C="Cyz").real
 
-    a = Cua.values / np.sqrt((Suu + Svv) * Saa).values
-    b = Cva.values / np.sqrt((Suu + Svv) * Saa).values
-    theta = np.arctan2(b, a)
-    phi = np.sqrt(2 * (1 - np.sqrt(a**2 + b**2)))
-    theta = np.nan_to_num(theta)  # fill missing data
-    phi = np.nan_to_num(phi)  # fill missing data
+    a = Cua.values / np.sqrt((Suu + Svv) * Saa)
+    b = Cva.values / np.sqrt((Suu + Svv) * Saa)
+    theta = np.rad2deg(np.arctan2(b, a))  # degrees CCW from East, "to" convention
+    phi = np.rad2deg(np.sqrt(2 * (1 - np.sqrt(a**2 + b**2))))
 
-    direction = np.arange(psd["time"].size)
-    spread = np.arange(psd["time"].size)
-    for i in range(0, psd["time"].size):
-        # degrees CW from North
-        direction[i] = (270 - np.rad2deg(np.trapz(theta[i], psd.freq))) % 360
-        # degrees
-        spread[i] = np.rad2deg(np.trapz(phi[i], psd.freq))
+    peak_idx = psd[2].argmax("freq")
+    # degrees CW from North ("from" convention)
+    direction = (270 - theta[:, peak_idx]) % 360
     # Set direction from -180 to 180
-    direction[direction > 180] = direction[direction > 180] - 360
+    direction[direction > 180] -= 360
+    spread = phi[:, peak_idx]
 
     ds_avg = xr.Dataset()
     ds_avg["Szz"] = Szz_imu
